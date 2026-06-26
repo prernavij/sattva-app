@@ -43,10 +43,27 @@ function FoodEntry({ entry, onRemove }) {
   )
 }
 
+async function lookupCalorieNinjas(query) {
+  const apiKey = import.meta.env.VITE_CALORIE_NINJAS_KEY
+  if (!apiKey) return null
+  const res = await fetch(`https://api.calorieninjas.com/v1/nutrition?query=${encodeURIComponent(query)}`, {
+    headers: { 'X-Api-Key': apiKey }
+  })
+  if (!res.ok) return null
+  const data = await res.json()
+  if (!data.items?.length) return null
+  const items = data.items
+  const totalKcal = Math.round(items.reduce((s, i) => s + i.calories, 0))
+  const totalProtein = Math.round(items.reduce((s, i) => s + i.protein_g, 0) * 10) / 10
+  const totalCarbs = Math.round(items.reduce((s, i) => s + i.carbohydrates_total_g, 0))
+  const totalFat = Math.round(items.reduce((s, i) => s + i.fat_total_g, 0))
+  const name = items.map(i => i.name).join(' + ')
+  return { name, kcal: totalKcal, protein: totalProtein, carbs: totalCarbs, fat: totalFat, items }
+}
+
 async function aiEstimateNutrition(foodText) {
   const apiKey = import.meta.env.VITE_ANTHROPIC_API_KEY
   if (!apiKey) return null
-
   const response = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: {
@@ -58,9 +75,9 @@ async function aiEstimateNutrition(foodText) {
     body: JSON.stringify({
       model: 'claude-haiku-4-5-20251001',
       max_tokens: 120,
-      system: `You are a nutrition estimator. Given a food description, return ONLY a JSON object with these fields:
-{"name": "clean food name", "kcal": <number>, "protein": <number>, "note": "brief serving note"}
-Estimate for a typical single serving. Be practical and accurate. No explanation, just JSON.`,
+      system: `You are a nutrition estimator. Given a food description, return ONLY a JSON object:
+{"name": "clean food name", "kcal": <number>, "protein": <number>, "carbs": <number>, "fat": <number>}
+Be practical and accurate. No explanation, just JSON.`,
       messages: [{ role: 'user', content: foodText }]
     })
   })
@@ -73,115 +90,123 @@ Estimate for a typical single serving. Be practical and accurate. No explanation
 
 function FoodLogger({ onClose, onLog }) {
   const [input, setInput] = useState('')
+  const [qty, setQty] = useState('1')
   const [meal, setMeal] = useState(guessMeal())
-  const [parsed, setParsed] = useState(null)
-  const [aiLoading, setAiLoading] = useState(false)
-  const [mode, setMode] = useState(null) // 'ai' | 'manual'
+  const [result, setResult] = useState(null)   // { name, kcal, protein, carbs, fat, source }
+  const [loading, setLoading] = useState(false)
+  const [mode, setMode] = useState(null)        // 'found' | 'manual'
   const [customName, setCustomName] = useState('')
   const [customKcal, setCustomKcal] = useState('')
   const [customProtein, setCustomProtein] = useState('')
-  const [aiNote, setAiNote] = useState('')
 
-  const handleParse = async () => {
+  const reset = () => { setResult(null); setMode(null) }
+
+  const handleLookup = async () => {
     if (!input.trim()) return
-    const result = parseFood(input)
-    if (result) {
-      setParsed(result)
-      setMode(null)
-      return
-    }
+    const qtyNum = parseFloat(qty) || 1
+    const query = qtyNum !== 1 ? `${qtyNum} ${input.trim()}` : input.trim()
 
-    // Not in database — try AI first, fall back to manual
-    setParsed(null)
-    setAiLoading(true)
+    setLoading(true)
+    setResult(null)
     setMode(null)
     try {
-      const ai = await aiEstimateNutrition(input)
-      if (ai) {
-        setCustomName(ai.name || input.trim())
-        setCustomKcal(String(Math.round(ai.kcal)))
-        setCustomProtein(String(Math.round(ai.protein * 10) / 10))
-        setAiNote(ai.note || '')
-        setMode('ai')
-      } else {
-        setCustomName(input.trim())
-        setCustomKcal('')
-        setCustomProtein('')
-        setMode('manual')
+      // 1. Try CalorieNinjas
+      const cn = await lookupCalorieNinjas(query)
+      if (cn) {
+        setResult({ ...cn, source: 'db' })
+        setMode('found')
+        setLoading(false)
+        return
       }
+      // 2. Fallback: AI estimate
+      const ai = await aiEstimateNutrition(query)
+      if (ai) {
+        setResult({ name: ai.name || input.trim(), kcal: Math.round(ai.kcal), protein: ai.protein, carbs: ai.carbs || 0, fat: ai.fat || 0, source: 'ai' })
+        setMode('found')
+        setLoading(false)
+        return
+      }
+      // 3. Manual fallback
+      setCustomName(input.trim())
+      setCustomKcal('')
+      setCustomProtein('')
+      setMode('manual')
     } catch {
       setCustomName(input.trim())
       setCustomKcal('')
       setCustomProtein('')
       setMode('manual')
     }
-    setAiLoading(false)
+    setLoading(false)
   }
 
-  const handleQuickPick = (qp) => {
-    setInput(qp)
-    const result = parseFood(qp)
-    if (result) { setParsed(result); setMode(null) }
-  }
+  const handleQuickPick = (qp) => { setInput(qp); setQty('1'); reset() }
 
   const handleConfirm = () => {
-    if (mode === 'ai' || mode === 'manual') {
+    if (mode === 'found' && result) {
+      onLog({ food_name: result.name, meal_type: meal, kcal: result.kcal, protein_g: result.protein })
+    } else if (mode === 'manual') {
       const kcal = parseInt(customKcal) || 0
       const protein = parseFloat(customProtein) || 0
       if (!customName.trim() || kcal === 0) return
       onLog({ food_name: customName.trim(), meal_type: meal, kcal, protein_g: protein })
-    } else {
-      if (!parsed) return
-      onLog({ food_name: parsed.description, meal_type: meal, kcal: parsed.kcal, protein_g: parsed.protein })
     }
     onClose()
   }
 
-  const canConfirm = mode ? (customName.trim() && parseInt(customKcal) > 0) : !!parsed
+  const canConfirm = mode === 'found' ? !!result : (mode === 'manual' && customName.trim() && parseInt(customKcal) > 0)
 
   return (
     <div className="fixed inset-0 z-40 flex flex-col justify-end">
       <div className="absolute inset-0 bg-black/40" onClick={onClose} />
-      <div className="relative bg-white rounded-t-3xl px-5 py-6 bottom-sheet max-h-[85vh] overflow-y-auto">
+      <div className="relative bg-white rounded-t-3xl px-5 py-6 bottom-sheet max-h-[90vh] overflow-y-auto">
         <div className="w-10 h-1 bg-stone-200 rounded-full mx-auto mb-5" />
         <h3 className="font-serif text-xl text-green-primary mb-4">Log food</h3>
 
-        {/* Natural language input */}
+        {/* Food input + quantity */}
         <div className="flex gap-2 mb-3">
           <input
             className="flex-1 border border-stone-200 rounded-xl px-4 py-3 text-base focus:border-green-primary"
-            placeholder="puffed rice, avocado toast, 2 idlis…"
+            placeholder="boiled egg, toast with peanut butter…"
             value={input}
-            onChange={e => { setInput(e.target.value); setParsed(null); setMode(null) }}
-            onKeyDown={e => e.key === 'Enter' && handleParse()}
+            onChange={e => { setInput(e.target.value); reset() }}
+            onKeyDown={e => e.key === 'Enter' && handleLookup()}
             autoFocus
           />
+          <input
+            type="number"
+            inputMode="decimal"
+            className="w-16 border border-stone-200 rounded-xl px-3 py-3 text-base text-center focus:border-green-primary"
+            value={qty}
+            onChange={e => { setQty(e.target.value); reset() }}
+            placeholder="1"
+            min="0.1"
+            step="0.5"
+          />
           <button
-            onClick={handleParse}
-            disabled={aiLoading}
-            className="px-4 py-3 bg-green-primary text-white rounded-xl font-medium text-sm disabled:opacity-60"
+            onClick={handleLookup}
+            disabled={loading || !input.trim()}
+            className="px-4 py-3 bg-green-primary text-white rounded-xl font-medium text-sm disabled:opacity-50"
           >
-            {aiLoading ? '…' : 'Parse'}
+            {loading ? '…' : 'Look up'}
           </button>
         </div>
+        <p className="text-xs text-stone-400 mb-4">Enter food name + quantity (e.g. "boiled egg" · 1.5)</p>
 
         {/* Quick picks */}
-        {!mode && !parsed && !aiLoading && (
+        {!mode && !loading && (
           <div className="flex flex-wrap gap-2 mb-4">
             {QUICK_PICKS.map(qp => (
-              <button
-                key={qp}
-                onClick={() => handleQuickPick(qp)}
-                className="px-3 py-1.5 bg-green-light text-green-primary rounded-pill text-xs font-medium"
-              >
+              <button key={qp} onClick={() => handleQuickPick(qp)}
+                className="px-3 py-1.5 bg-green-light text-green-primary rounded-pill text-xs font-medium">
                 {qp}
               </button>
             ))}
           </div>
         )}
 
-        {/* AI thinking state */}
-        {aiLoading && (
+        {/* Loading */}
+        {loading && (
           <div className="mb-4 rounded-xl bg-green-light px-4 py-3 flex items-center gap-3">
             <div className="flex gap-1">
               {[0,1,2].map(i => (
@@ -189,73 +214,57 @@ function FoodLogger({ onClose, onLog }) {
                   style={{ animationDelay: `${i * 0.15}s` }} />
               ))}
             </div>
-            <p className="text-xs text-green-primary font-medium">Estimating nutrition with AI…</p>
+            <p className="text-xs text-green-primary font-medium">Looking up nutrition…</p>
           </div>
         )}
 
-        {/* Parsed result from database */}
-        {parsed && !mode && (
-          <div className="bg-green-light rounded-xl p-4 mb-4">
-            <p className="font-semibold text-green-primary mb-1">{parsed.description}</p>
-            <div className="flex gap-4">
-              <span className="text-sm text-stone-600">{parsed.kcal} kcal</span>
-              <span className="text-sm text-stone-600">{parsed.protein}g protein</span>
+        {/* Result */}
+        {mode === 'found' && result && (
+          <div className="mb-4 rounded-xl p-4" style={{ background: '#F5F7F3', border: '1px solid #DDE4DA' }}>
+            <div className="flex justify-between items-start mb-2">
+              <p className="font-semibold text-stone-800 flex-1 pr-2 capitalize">{result.name}</p>
+              {result.source === 'ai' && (
+                <span className="text-[10px] font-medium text-green-primary bg-green-light px-2 py-0.5 rounded-pill shrink-0">AI estimate</span>
+              )}
             </div>
+            <div className="grid grid-cols-4 gap-2 text-center">
+              {[
+                { label: 'Calories', value: result.kcal, unit: 'kcal' },
+                { label: 'Protein', value: result.protein, unit: 'g' },
+                { label: 'Carbs', value: result.carbs, unit: 'g' },
+                { label: 'Fat', value: result.fat, unit: 'g' },
+              ].map(m => (
+                <div key={m.label} className="bg-white rounded-lg py-2">
+                  <p className="text-sm font-bold text-stone-800">{m.value}<span className="text-xs font-normal text-stone-400">{m.unit}</span></p>
+                  <p className="text-[10px] text-stone-400">{m.label}</p>
+                </div>
+              ))}
+            </div>
+            <button onClick={reset} className="mt-2 text-xs text-stone-400 underline">Search again</button>
           </div>
         )}
 
-        {/* AI or manual entry */}
-        {mode && (
+        {/* Manual fallback */}
+        {mode === 'manual' && (
           <div className="mb-4 rounded-xl border border-stone-200 p-4">
-            {mode === 'ai' ? (
-              <div className="flex items-center gap-2 mb-3">
-                <span className="text-xs font-medium text-green-primary bg-green-light px-2 py-0.5 rounded-pill">AI estimated</span>
-                {aiNote && <span className="text-xs text-stone-400">{aiNote}</span>}
-              </div>
-            ) : (
-              <p className="text-xs text-stone-400 mb-3">Enter the details manually</p>
-            )}
+            <p className="text-xs text-stone-400 mb-3">Not found — enter details manually</p>
             <div className="mb-3">
               <label className="text-xs font-medium text-stone-500 block mb-1">Food name</label>
-              <input
-                className="w-full border border-stone-200 rounded-xl px-3 py-2.5 text-sm focus:border-green-primary"
-                value={customName}
-                onChange={e => setCustomName(e.target.value)}
-                placeholder="What did you eat?"
-              />
+              <input className="w-full border border-stone-200 rounded-xl px-3 py-2.5 text-sm focus:border-green-primary"
+                value={customName} onChange={e => setCustomName(e.target.value)} placeholder="What did you eat?" />
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="text-xs font-medium text-stone-500 block mb-1">Calories (kcal)</label>
-                <input
-                  className="w-full border border-stone-200 rounded-xl px-3 py-2.5 text-sm focus:border-green-primary"
-                  type="number"
-                  inputMode="numeric"
-                  value={customKcal}
-                  onChange={e => setCustomKcal(e.target.value)}
-                  placeholder="e.g. 350"
-                />
+                <input className="w-full border border-stone-200 rounded-xl px-3 py-2.5 text-sm focus:border-green-primary"
+                  type="number" inputMode="numeric" value={customKcal} onChange={e => setCustomKcal(e.target.value)} placeholder="e.g. 350" />
               </div>
               <div>
                 <label className="text-xs font-medium text-stone-500 block mb-1">Protein (g)</label>
-                <input
-                  className="w-full border border-stone-200 rounded-xl px-3 py-2.5 text-sm focus:border-green-primary"
-                  type="number"
-                  inputMode="decimal"
-                  value={customProtein}
-                  onChange={e => setCustomProtein(e.target.value)}
-                  placeholder="e.g. 12"
-                />
+                <input className="w-full border border-stone-200 rounded-xl px-3 py-2.5 text-sm focus:border-green-primary"
+                  type="number" inputMode="decimal" value={customProtein} onChange={e => setCustomProtein(e.target.value)} placeholder="e.g. 12" />
               </div>
             </div>
-            {mode === 'ai' && (
-              <button
-                onClick={() => { setCustomKcal(''); setCustomProtein(''); setMode('manual') }}
-                className="mt-2 text-xs text-stone-400 underline"
-              >
-                Edit manually instead
-              </button>
-            )}
           </div>
         )}
 
@@ -264,27 +273,18 @@ function FoodLogger({ onClose, onLog }) {
           <p className="text-xs font-medium text-stone-500 mb-2">Meal</p>
           <div className="flex gap-2">
             {MEALS.map(m => (
-              <button
-                key={m}
-                onClick={() => setMeal(m)}
+              <button key={m} onClick={() => setMeal(m)}
                 className="flex-1 py-2 rounded-xl text-xs font-medium transition-all"
-                style={{
-                  background: meal === m ? '#3D5240' : '#E4E7DF',
-                  color: meal === m ? '#fff' : '#666',
-                }}
-              >
+                style={{ background: meal === m ? '#3D5240' : '#E4E7DF', color: meal === m ? '#fff' : '#666' }}>
                 {MEAL_ICONS[m]} {MEAL_LABELS[m]}
               </button>
             ))}
           </div>
         </div>
 
-        <button
-          onClick={handleConfirm}
-          disabled={!canConfirm}
+        <button onClick={handleConfirm} disabled={!canConfirm}
           className="w-full py-3.5 rounded-xl font-semibold text-white transition-all"
-          style={{ background: canConfirm ? '#3D5240' : '#BDC9B6' }}
-        >
+          style={{ background: canConfirm ? '#3D5240' : '#BDC9B6' }}>
           Add to {MEAL_LABELS[meal]}
         </button>
       </div>
