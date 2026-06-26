@@ -65,30 +65,30 @@ function LogTab() {
 
   return (
     <div className="flex-1 overflow-y-auto scrollable px-4 py-4">
-      {/* Activity chips */}
+      {/* Activity */}
       <div>
         <p className="text-xs font-semibold text-stone-400 uppercase tracking-wide mb-2.5">Activity</p>
-        <div className="grid grid-cols-4 gap-2">
-          {ACTIVITIES.map(a => (
-            <button
-              key={a.id}
-              onClick={() => { setActivity(a.id); setCustomActivity('') }}
-              className="flex flex-col items-center py-3 rounded-xl border-2 transition-all active:scale-95"
-              style={{
-                borderColor: !isCustom && activity === a.id ? '#3D5240' : '#E5E7EB',
-                background: !isCustom && activity === a.id ? '#FDF1E8' : '#fff',
-              }}
-            >
-              <span className="text-xl">{a.icon}</span>
-              <span className="text-[11px] font-medium mt-1"
-                style={{ color: !isCustom && activity === a.id ? '#3D5240' : '#9CA3AF' }}>
-                {a.label}
-              </span>
-            </button>
-          ))}
+        <div className="flex gap-2 overflow-x-auto scrollable pb-1 -mx-4 px-4">
+          {ACTIVITIES.map(a => {
+            const on = !isCustom && activity === a.id
+            return (
+              <button
+                key={a.id}
+                onClick={() => { setActivity(a.id); setCustomActivity('') }}
+                className="shrink-0 flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium transition-all"
+                style={{
+                  background: on ? '#3D5240' : '#E8EDE6',
+                  color: on ? '#fff' : '#5A6B5C',
+                }}
+              >
+                <span>{a.icon}</span>
+                <span>{a.label}</span>
+              </button>
+            )
+          })}
         </div>
         <input
-          className="w-full mt-2 border border-stone-200 rounded-xl px-4 py-2.5 text-sm focus:border-activity"
+          className="w-full mt-3 border border-stone-200 rounded-xl px-4 py-2.5 text-sm focus:border-green-primary bg-white"
           placeholder="Or type any activity — pilates, cricket, martial arts…"
           value={customActivity}
           onChange={e => setCustomActivity(e.target.value)}
