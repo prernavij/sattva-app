@@ -11,23 +11,44 @@ function greeting() {
   return 'Good evening'
 }
 
-function MetricCard({ label, value, goal, unit, pct, color, onTap, icon }) {
+// Returns { color, bg, status } based on value vs goal and time of day
+function getDailyStatus(value, goal, type = 'default') {
+  const hour = new Date().getHours()
+  const pct = goal > 0 ? value / goal : 0
+  const expectedFrac = Math.max(0, Math.min((hour - 7) / 14, 1))
+
+  if (type === 'calories') {
+    if (pct > 1.1)  return { status: 'over',      color: '#DC2626', bg: '#FEF2F2' }
+    if (pct > 1.0)  return { status: 'at_limit',  color: '#D97706', bg: '#FFF7ED' }
+    if (pct > 0.85) return { status: 'near',       color: '#D97706', bg: '#FFF7ED' }
+    return            { status: 'ok',            color: '#3D5240', bg: null }
+  }
+  if (pct >= 0.95)                      return { status: 'done',         color: '#3D5240', bg: '#E2EAE0' }
+  if (hour >= 19 && pct < 0.4)         return { status: 'critical_low', color: '#DC2626', bg: '#FEF2F2' }
+  if (hour >= 17 && pct < 0.6)         return { status: 'behind_late',  color: '#D97706', bg: '#FFF7ED' }
+  return                                 { status: 'ok',            color: '#3D5240', bg: null }
+}
+
+function MetricCard({ label, value, goal, unit, pct, color, onTap, status }) {
+  const statusColor = status?.color || color
+  const statusBg = status?.bg
   return (
     <button
       onClick={onTap}
-      className="bg-white rounded-2xl p-4 shadow-card flex flex-col gap-2 text-left active:scale-95 transition-transform"
+      className="rounded-2xl p-4 shadow-card flex flex-col gap-2 text-left active:scale-95 transition-transform"
+      style={{ background: statusBg || '#fff' }}
     >
       <div className="flex justify-between items-center">
         <span className="text-xs text-stone-500 font-medium uppercase tracking-wide">{label}</span>
         <span className="text-xs font-semibold rounded-pill px-2 py-0.5"
-          style={{ background: color + '22', color }}>
+          style={{ background: statusColor + '22', color: statusColor }}>
           {Math.round(pct)}%
         </span>
       </div>
       <div className="text-base font-semibold text-stone-800 leading-tight">
         {value}<span className="text-xs font-normal text-stone-400 ml-1">/ {goal} {unit}</span>
       </div>
-      <ProgressBar value={value} max={goal} color={color} height={5} />
+      <ProgressBar value={value} max={goal} color={statusColor} height={5} />
     </button>
   )
 }
@@ -101,11 +122,27 @@ export default function Home({ onNavigate }) {
   const goalsHit = weekData.filter(d => d.val >= goals.cal_goal * 0.85 && d.val <= goals.cal_goal * 1.15).length
 
   const calPct = goals.cal_goal > 0 ? Math.min(Math.round((todayKcal / goals.cal_goal) * 100), 100) : 0
+  const calSt   = getDailyStatus(todayKcal, goals.cal_goal, 'calories')
+  const protSt  = getDailyStatus(todayProtein, goals.protein_goal, 'protein')
+  const waterSt = getDailyStatus(todayWater_l, goals.water_goal_l, 'water')
+  const sleepSt = getDailyStatus(todaySleep_h, goals.sleep_goal_h, 'sleep')
+
+  // Inline callouts for over-goal / behind-late situations
+  const hour = new Date().getHours()
+  const homeAlerts = []
+  if (calSt.status === 'over')
+    homeAlerts.push({ key: 'cal', color: '#DC2626', bg: '#FEF2F2', msg: `${todayKcal - goals.cal_goal} kcal over — consider a lighter dinner` })
+  else if (calSt.status === 'at_limit')
+    homeAlerts.push({ key: 'cal', color: '#D97706', bg: '#FFF7ED', msg: 'Right at your calorie limit' })
+  if (hour >= 19 && protSt.status === 'critical_low')
+    homeAlerts.push({ key: 'prot', color: '#DC2626', bg: '#FEF2F2', msg: `${Math.round(goals.protein_goal - todayProtein)}g protein left — try eggs or cottage cheese` })
+  else if (hour >= 17 && protSt.status === 'behind_late')
+    homeAlerts.push({ key: 'prot', color: '#D97706', bg: '#FFF7ED', msg: `${Math.round(goals.protein_goal - todayProtein)}g protein left — add a protein snack` })
 
   return (
     <div className="flex flex-col flex-1 overflow-hidden">
-      {/* Header — warm white, no harsh color */}
-      <div className="px-5 pt-12 pb-5 shrink-0" style={{ background: '#EFF0EB' }}>
+      {/* Header */}
+      <div className="px-5 pt-12 pb-5 shrink-0" style={{ background: calSt.bg || '#EFF0EB', transition: 'background 0.4s' }}>
         <div className="flex justify-between items-start mb-4">
           <div>
             <p className="text-sm font-normal mb-0.5" style={{ color: '#8A9688' }}>{greeting()}</p>
@@ -128,21 +165,37 @@ export default function Home({ onNavigate }) {
             </div>
           </div>
         </div>
-        {/* Calorie bar — big and satisfying */}
+        {/* Calorie bar — color shifts with status */}
         <div>
           <div className="flex justify-between items-baseline mb-1.5">
-            <span className="text-xs font-medium" style={{ color: '#8A9688' }}>
-              Calories today
-            </span>
-            <span className="text-xs font-semibold" style={{ color: calPct >= 90 ? '#3D5240' : '#1C1410' }}>
+            <span className="text-xs font-medium" style={{ color: '#8A9688' }}>Calories today</span>
+            <span className="text-xs font-semibold" style={{ color: calSt.color }}>
               {todayKcal} <span style={{ color: '#8A9688', fontWeight: 400 }}>/ {goals.cal_goal} kcal</span>
             </span>
           </div>
           <div className="h-2 rounded-full overflow-hidden" style={{ background: '#E4E7DF' }}>
-            <div className="h-full rounded-full progress-bar-fill" style={{ width: `${calPct}%`, background: '#3D5240' }} />
+            <div className="h-full rounded-full progress-bar-fill transition-all"
+              style={{ width: `${calPct}%`, background: calSt.color }} />
           </div>
+          {calSt.status === 'over' && (
+            <p className="text-xs mt-1 font-medium" style={{ color: '#DC2626' }}>
+              {todayKcal - goals.cal_goal} kcal over goal
+            </p>
+          )}
         </div>
       </div>
+
+      {/* Alert chips */}
+      {homeAlerts.length > 0 && (
+        <div className="flex gap-2 px-4 py-2 overflow-x-auto scrollable bg-white border-b border-stone-100">
+          {homeAlerts.map(a => (
+            <div key={a.key} className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium"
+              style={{ background: a.bg, color: a.color }}>
+              {a.msg}
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Scrollable content */}
       <div className="flex-1 overflow-y-auto scrollable px-4 py-4 flex flex-col gap-4">
@@ -180,6 +233,7 @@ export default function Home({ onNavigate }) {
               unit="g"
               pct={(todayProtein / goals.protein_goal) * 100}
               color="#3D5240"
+              status={protSt}
               onTap={() => onNavigate('food')}
             />
             <MetricCard
@@ -189,6 +243,7 @@ export default function Home({ onNavigate }) {
               unit="L"
               pct={(todayWater_l / goals.water_goal_l) * 100}
               color="#3D5240"
+              status={waterSt}
               onTap={() => onNavigate('water')}
             />
             <MetricCard
@@ -198,6 +253,7 @@ export default function Home({ onNavigate }) {
               unit="h"
               pct={(todaySleep_h / goals.sleep_goal_h) * 100}
               color="#3D5240"
+              status={sleepSt}
               onTap={() => onNavigate('activity')}
             />
             <MetricCard

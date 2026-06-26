@@ -7,26 +7,100 @@ const MEALS = ['breakfast', 'lunch', 'snack', 'dinner']
 const MEAL_LABELS = { breakfast: 'Breakfast', lunch: 'Lunch', snack: 'Snack', dinner: 'Dinner' }
 const MEAL_ICONS = { breakfast: '🌅', lunch: '☀️', snack: '🍎', dinner: '🌙' }
 
+// Returns status info based on value vs goal and time of day
+function getDailyStatus(value, goal, type = 'default') {
+  const hour = new Date().getHours()
+  const pct = goal > 0 ? value / goal : 0
+  // Expected eating fraction: 7am–9pm window
+  const expectedFrac = Math.max(0, Math.min((hour - 7) / 14, 1))
+
+  if (type === 'calories') {
+    if (pct > 1.1)  return { status: 'over',     color: '#DC2626', bg: '#FEF2F2' }
+    if (pct > 1.0)  return { status: 'at_limit',  color: '#D97706', bg: '#FFF7ED' }
+    if (pct > 0.85) return { status: 'near',      color: '#D97706', bg: '#FFF7ED' }
+    return            { status: 'ok',           color: '#3D5240', bg: null }
+  }
+  // protein / water — being behind late in day is a warning
+  if (pct >= 0.95)                          return { status: 'done',        color: '#3D5240', bg: '#E2EAE0' }
+  if (hour >= 19 && pct < 0.4)             return { status: 'critical_low', color: '#DC2626', bg: '#FEF2F2' }
+  if (hour >= 17 && pct < 0.6)             return { status: 'behind_late',  color: '#D97706', bg: '#FFF7ED' }
+  return                                     { status: 'ok',           color: '#3D5240', bg: null }
+}
+
+function getAlerts(kcal, protein, calGoal, proteinGoal) {
+  const hour = new Date().getHours()
+  const alerts = []
+  const calPct = calGoal > 0 ? kcal / calGoal : 0
+  const protPct = proteinGoal > 0 ? protein / proteinGoal : 0
+  const protLeft = Math.round(proteinGoal - protein)
+
+  if (calPct > 1.1) {
+    alerts.push({ key: 'cal_over', icon: '🔴', color: '#DC2626', bg: '#FEF2F2', msg: `${kcal - calGoal} kcal over goal — skip that dessert` })
+  } else if (calPct > 1.0) {
+    alerts.push({ key: 'cal_limit', icon: '🟡', color: '#D97706', bg: '#FFF7ED', msg: 'Right at your calorie limit' })
+  } else if (calPct > 0.85 && hour < 15) {
+    alerts.push({ key: 'cal_early', icon: '⚠️', color: '#D97706', bg: '#FFF7ED', msg: `${Math.round(calGoal * 0.15)} kcal left before 3pm` })
+  }
+
+  if (hour >= 19 && protPct < 0.4) {
+    alerts.push({ key: 'prot_critical', icon: '💪', color: '#DC2626', bg: '#FEF2F2', msg: `${protLeft}g protein left — try eggs or cottage cheese` })
+  } else if (hour >= 17 && protPct < 0.6) {
+    alerts.push({ key: 'prot_low', icon: '💪', color: '#D97706', bg: '#FFF7ED', msg: `${protLeft}g protein left — add a protein-rich snack` })
+  }
+
+  return alerts
+}
+
 function MacroStrip({ kcal, protein, calGoal, proteinGoal }) {
-  const kcalLeft = Math.max(0, calGoal - kcal)
+  const kcalOver = kcal > calGoal
+  const kcalLeft = calGoal - kcal // can be negative
   const protLeft = Math.max(0, proteinGoal - protein)
+  const calSt = getDailyStatus(kcal, calGoal, 'calories')
+  const protSt = getDailyStatus(protein, proteinGoal, 'protein')
+  const alerts = getAlerts(kcal, protein, calGoal, proteinGoal)
+
+  // Progress bar color
+  const barColor = calSt.status === 'over' || calSt.status === 'at_limit' ? calSt.color : '#3D5240'
+
   return (
-    <div className="bg-white border-b border-stone-100 px-4 py-3">
-      <div className="grid grid-cols-4 gap-0 text-center">
+    <div className="bg-white border-b border-stone-100">
+      {/* Alert banner */}
+      {alerts.length > 0 && (
+        <div className="flex gap-2 px-4 pt-2.5 pb-0 overflow-x-auto scrollable">
+          {alerts.map(a => (
+            <div key={a.key} className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium"
+              style={{ background: a.bg, color: a.color }}>
+              {a.icon} {a.msg}
+            </div>
+          ))}
+        </div>
+      )}
+      <div className="grid grid-cols-4 gap-0 text-center px-4 pt-3 pb-1">
         {[
-          { label: 'Eaten', value: kcal, unit: 'kcal', color: '#3D5240' },
-          { label: 'Protein', value: `${Math.round(protein)}g`, unit: '', color: '#3D5240' },
-          { label: 'Remaining', value: kcalLeft, unit: 'kcal', color: '#3D5240' },
-          { label: 'Prot left', value: `${Math.round(protLeft)}g`, unit: '', color: '#3D5240' },
+          { label: 'Eaten', value: kcal, unit: 'kcal', st: calSt },
+          { label: 'Protein', value: `${Math.round(protein)}g`, unit: '', st: protSt },
+          { label: kcalOver ? 'Over by' : 'Remaining', value: Math.abs(kcalLeft), unit: 'kcal', st: kcalOver ? { color: '#DC2626' } : { color: '#3D5240' } },
+          { label: 'Prot left', value: `${Math.round(protLeft)}g`, unit: '', st: protSt.status === 'behind_late' || protSt.status === 'critical_low' ? protSt : { color: '#3D5240' } },
         ].map((m, i) => (
           <div key={i} className="flex flex-col items-center border-r border-stone-100 last:border-0 px-1">
-            <span className="text-base font-bold" style={{ color: m.color }}>{m.value}</span>
+            <span className="text-base font-bold" style={{ color: m.st.color }}>{m.value}</span>
             {m.unit && <span className="text-[10px] text-stone-400">{m.unit}</span>}
             <span className="text-[10px] text-stone-400 mt-0.5">{m.label}</span>
           </div>
         ))}
       </div>
-      <ProgressBar value={kcal} max={calGoal} color="#3D5240" height={4} className="mt-2" />
+      <div className="px-4 pb-3">
+        <div className="h-1.5 rounded-full overflow-hidden mt-1" style={{ background: '#E4E7DF' }}>
+          <div className="h-full rounded-full transition-all"
+            style={{ width: `${Math.min((kcal / calGoal) * 100, 100)}%`, background: barColor }} />
+        </div>
+        {kcalOver && (
+          <div className="h-1 rounded-full mt-0.5 overflow-hidden" style={{ background: '#FEE2E2' }}>
+            <div className="h-full rounded-full bg-red-500 transition-all"
+              style={{ width: `${Math.min(((kcal - calGoal) / calGoal) * 100 * 5, 100)}%` }} />
+          </div>
+        )}
+      </div>
     </div>
   )
 }
