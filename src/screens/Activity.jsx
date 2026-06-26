@@ -45,44 +45,62 @@ function calcKcalBurned(met, intensityMulti, weightKg, durationMin) {
   return Math.round(met * intensityMulti * weightKg * (durationMin / 60))
 }
 
-function WeeklyGoalBar({ goals, profile, weekDaysWithActivity, weekStrengthSessions, weekCardioMin, weekKcalBurned }) {
-  const activeGoals = Array.isArray(profile.goals) ? profile.goals : []
-  const hasStrength  = activeGoals.includes('build_strength')
-  const hasEndurance = activeGoals.includes('improve_endurance')
-  const hasLoseFat   = activeGoals.includes('lose_fat')
+// Maps each goal → what weekly activity target it drives and how to measure it
+function goalActivityTargets(activeGoals, goals, weekStrengthSessions, weekCardioMin, weekDaysWithActivity) {
+  const bars = []
+  const has = (id) => activeGoals.includes(id)
 
-  let label, value, max, unit, sub
-
-  if (hasStrength && hasEndurance) {
-    label = 'This week'; value = weekDaysWithActivity; max = goals.workout_goal_week; unit = 'sessions'
-    sub = `${weekStrengthSessions} strength · ${Math.round(weekCardioMin)}min cardio`
-  } else if (hasStrength) {
-    label = 'Strength sessions'; value = weekStrengthSessions; max = goals.workout_goal_week; unit = 'sessions'
-    sub = `${weekDaysWithActivity} active day${weekDaysWithActivity !== 1 ? 's' : ''} this week`
-  } else if (hasEndurance) {
-    const target = goals.workout_goal_week * 45
-    label = 'Cardio minutes'; value = Math.round(weekCardioMin); max = target; unit = 'min'
-    sub = `${weekDaysWithActivity} active day${weekDaysWithActivity !== 1 ? 's' : ''} this week`
-  } else {
-    label = 'Active days'; value = weekDaysWithActivity; max = goals.workout_goal_week; unit = 'days'
-    sub = `${weekStrengthSessions} strength · ${Math.round(weekCardioMin)} min cardio`
+  if (has('lose_fat')) {
+    const target = 150 // 150 min cardio/week (3×50 or 5×30)
+    bars.push({ icon: '📉', label: 'Cardio for fat loss', value: Math.round(weekCardioMin), max: target, unit: 'min', hint: '150 min/week cardio target' })
   }
+  if (has('build_strength')) {
+    const target = goals.workout_goal_week
+    bars.push({ icon: '💪', label: 'Strength sessions', value: weekStrengthSessions, max: target, unit: 'sessions', hint: `${target} sessions/week target` })
+  }
+  if (has('improve_endurance')) {
+    const target = 180
+    bars.push({ icon: '🏃', label: 'Endurance cardio', value: Math.round(weekCardioMin), max: target, unit: 'min', hint: '180 min/week cardio target' })
+  }
+  if (has('maintain_weight')) {
+    bars.push({ icon: '⚖️', label: 'Active days', value: weekDaysWithActivity, max: 4, unit: 'days', hint: '4 active days/week target' })
+  }
+  if (has('manage_stress') || has('better_sleep')) {
+    const recoveryLabel = has('manage_stress') && has('better_sleep') ? 'Recovery & sleep' : has('manage_stress') ? 'Stress relief' : 'Sleep quality'
+    // count yoga/walk/recovery sessions from active days as proxy
+    bars.push({ icon: has('manage_stress') ? '🧘' : '😴', label: recoveryLabel, value: weekDaysWithActivity, max: 3, unit: 'sessions', hint: '3 recovery sessions/week' })
+  }
+  // Fallback if no mapped goal
+  if (bars.length === 0) {
+    bars.push({ icon: '🏃', label: 'Active days', value: weekDaysWithActivity, max: goals.workout_goal_week, unit: 'days', hint: `${goals.workout_goal_week} days/week target` })
+  }
+  return bars
+}
 
-  const pct = max > 0 ? Math.min((value / max) * 100, 100) : 0
-  const done = value >= max
+function GoalProgressBars({ goals, profile, weekDaysWithActivity, weekStrengthSessions, weekCardioMin }) {
+  const activeGoals = Array.isArray(profile.goals) ? profile.goals : []
+  const bars = goalActivityTargets(activeGoals, goals, weekStrengthSessions, weekCardioMin, weekDaysWithActivity)
 
   return (
-    <div className="px-4 py-3 border-b border-stone-100 bg-white">
-      <div className="flex justify-between items-baseline mb-1.5">
-        <span className="text-xs font-medium text-stone-500">{label}</span>
-        <span className="text-xs font-semibold" style={{ color: done ? '#3D5240' : '#1C1410' }}>
-          {value} <span className="text-stone-400 font-normal">/ {max} {unit}</span>
-        </span>
-      </div>
-      <div className="h-1.5 rounded-full overflow-hidden mb-1" style={{ background: '#E4E7DF' }}>
-        <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, background: done ? '#3D5240' : '#7A9E7E' }} />
-      </div>
-      <p className="text-[11px] text-stone-400">{sub}</p>
+    <div className="px-4 pt-3 pb-2 border-b border-stone-100 bg-white flex flex-col gap-2.5">
+      {bars.map(({ icon, label, value, max, unit, hint }) => {
+        const pct = max > 0 ? Math.min((value / max) * 100, 100) : 0
+        const done = value >= max
+        return (
+          <div key={label}>
+            <div className="flex justify-between items-baseline mb-1">
+              <span className="text-xs font-medium text-stone-600">{icon} {label}</span>
+              <span className="text-xs font-semibold" style={{ color: done ? '#3D5240' : '#1C1410' }}>
+                {value}<span className="text-stone-400 font-normal"> / {max} {unit}</span>
+              </span>
+            </div>
+            <div className="h-1.5 rounded-full overflow-hidden" style={{ background: '#E4E7DF' }}>
+              <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, background: done ? '#3D5240' : '#7A9E7E' }} />
+            </div>
+            {done && <p className="text-[10px] mt-0.5" style={{ color: '#3D5240' }}>✓ Weekly target hit</p>}
+          </div>
+        )
+      })}
     </div>
   )
 }
@@ -135,9 +153,9 @@ function LogTab() {
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
-    <WeeklyGoalBar goals={goals} profile={profile}
+    <GoalProgressBars goals={goals} profile={profile}
       weekDaysWithActivity={weekDaysWithActivity} weekStrengthSessions={weekStrengthSessions}
-      weekCardioMin={weekCardioMin} weekKcalBurned={weekKcalBurned} />
+      weekCardioMin={weekCardioMin} />
     <div className="flex-1 overflow-y-auto scrollable px-4 py-4">
       {/* Activity pills */}
       <div className="flex gap-2 overflow-x-auto scrollable pb-1 -mx-4 px-4">
