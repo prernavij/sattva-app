@@ -114,10 +114,10 @@ export default function Home({ onNavigate }) {
             </h1>
           </div>
           <div className="flex items-center gap-2">
-            {streak >= 2 && (
+            {streak >= 1 && (
               <span className="rounded-pill px-2.5 py-1 text-xs font-medium"
                 style={{ background: '#E2EAE0', color: '#3D5240' }}>
-                🔥 {streak}d
+                🔥 {streak}d streak
               </span>
             )}
             <div className="w-9 h-9 rounded-full flex items-center justify-center"
