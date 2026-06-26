@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useApp, calcGoals } from '../context/AppContext'
+import { supabase } from '../lib/supabase'
 import DiyaLogo from '../components/DiyaLogo'
 
 function Toggle({ value, onChange }) {
@@ -33,7 +34,7 @@ function TimePicker({ value, onChange, label, enabled }) {
 }
 
 export default function Profile() {
-  const { profile, updateProfile, goals, notifSettings, setNotifSettings, streak, bodyLogs } = useApp()
+  const { profile, updateProfile, goals, notifSettings, setNotifSettings, streak, bodyLogs, signOut } = useApp()
   const [editing, setEditing] = useState(false)
   const [editForm, setEditForm] = useState({ ...profile, target_weight_lbs: profile.target_weight_lbs ?? '' })
   const [activeSection, setActiveSection] = useState('profile') // 'profile' | 'notif'
@@ -340,6 +341,31 @@ export default function Profile() {
         )}
 
         <div className="h-6" />
+
+        <div className="mx-4 mb-6 flex flex-col gap-2">
+          <button
+            onClick={signOut}
+            className="w-full py-3 rounded-xl text-sm font-medium border border-stone-200 text-stone-400"
+          >
+            Sign out
+          </button>
+          <button
+            onClick={async () => {
+              // Delete profile from Supabase so onboarding runs again on next sign-in
+              const { data: { user } } = await supabase.auth.getUser()
+              if (user) {
+                await supabase.from('profiles').delete().eq('user_id', user.id)
+              }
+              await signOut()
+              localStorage.clear()
+              sessionStorage.clear()
+              window.location.reload()
+            }}
+            className="w-full py-2.5 rounded-xl text-xs font-medium text-stone-300 border border-dashed border-stone-200"
+          >
+            Reset app (re-run onboarding)
+          </button>
+        </div>
       </div>
     </div>
   )

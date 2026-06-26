@@ -67,6 +67,7 @@ export function AppProvider({ children }) {
   // Auth
   const [user, setUser] = useState(null)
   const [authLoading, setAuthLoading] = useState(true)
+  const [dataLoading, setDataLoading] = useState(false)
   const profileIdRef = useRef(null)
 
   const [onboarded, setOnboarded] = useState(() => loadLocal('sattva_onboarded', false))
@@ -101,10 +102,12 @@ export function AppProvider({ children }) {
 
   // Check for existing session on mount
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (session?.user) {
         setUser(session.user)
-        loadFromSupabase(session.user.id)
+        setDataLoading(true)
+        await loadFromSupabase(session.user.id)
+        setDataLoading(false)
       }
       setAuthLoading(false)
     })
@@ -167,7 +170,9 @@ export function AppProvider({ children }) {
 
   const handleAuth = useCallback(async (authUser) => {
     setUser(authUser)
+    setDataLoading(true)
     await loadFromSupabase(authUser.id)
+    setDataLoading(false)
   }, [])
 
   const signOut = useCallback(async () => {
@@ -340,7 +345,7 @@ export function AppProvider({ children }) {
     setTimeout(() => setBanner(null), 7000)
   }, [])
 
-  if (authLoading) return null
+  if (authLoading || dataLoading) return null
 
   const ctx = {
     user, handleAuth, signOut,

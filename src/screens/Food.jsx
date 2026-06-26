@@ -312,51 +312,31 @@ function ConsultTab() {
     setLoading(true)
 
     try {
-      const apiKey = import.meta.env.VITE_ANTHROPIC_API_KEY
-      if (!apiKey) {
-        // Demo mode fallback
-        const demo = getDemoResponse(userMsg, kcalLeft, protLeft)
-        setMessages(m => [...m, { role: 'assistant', text: demo }])
-        setLoading(false)
-        return
-      }
+      const apiKey = import.meta.env.VITE_GEMINI_API_KEY
+      const systemPrompt = `You are Sattva, a practical, non-preachy food consultant. The user has ${kcalLeft} kcal and ${protLeft.toFixed(0)}g protein remaining for today. Give concrete, actionable advice in 2-4 sentences. If they want an indulgent option, tell them how to make it work. Reference specific numbers when helpful. Never shame food choices. Keep tone warm and friendly, like a knowledgeable friend.`
 
-      const systemPrompt = `You are Sattva, a practical, non-preachy food consultant. The user has ${kcalLeft} kcal and ${protLeft.toFixed(0)}g protein remaining for today.
+      const history = messages.slice(1).map(m => ({
+        role: m.role === 'assistant' ? 'model' : 'user',
+        parts: [{ text: m.text }]
+      }))
 
-      Guidelines:
-      - Give concrete, actionable advice in 2-4 sentences
-      - If they want an indulgent option, tell them how to make it work
-      - Reference specific numbers (kcal, protein) when helpful
-      - Never shame food choices
-      - If asked about portions, be specific
-      - Keep tone warm and friendly, like a knowledgeable friend`
-
-      const response = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: {
-          'x-api-key': apiKey,
-          'anthropic-version': '2023-06-01',
-          'content-type': 'application/json',
-          'anthropic-dangerous-direct-browser-access': 'true',
-        },
-        body: JSON.stringify({
-          model: 'claude-sonnet-4-6',
-          max_tokens: 256,
-          system: systemPrompt,
-          messages: [
-            ...messages.filter(m => m.role !== 'assistant' || messages.indexOf(m) > 0).map(m => ({
-              role: m.role,
-              content: m.text
-            })),
-            { role: 'user', content: userMsg }
-          ]
-        })
-      })
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
+        {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({
+            system_instruction: { parts: [{ text: systemPrompt }] },
+            contents: [...history, { role: 'user', parts: [{ text: userMsg }] }],
+            generationConfig: { maxOutputTokens: 256, temperature: 0.7 }
+          })
+        }
+      )
       const data = await response.json()
-      const reply = data.content?.[0]?.text || 'Sorry, I had trouble responding. Try again!'
+      const reply = data.candidates?.[0]?.content?.parts?.[0]?.text || 'Sorry, I had trouble responding. Try again!'
       setMessages(m => [...m, { role: 'assistant', text: reply }])
     } catch {
-      setMessages(m => [...m, { role: 'assistant', text: 'I\'m having connection trouble. But based on your remaining budget, focus on high-protein, lower-calorie options.' }])
+      setMessages(m => [...m, { role: 'assistant', text: 'Having trouble connecting. Based on your budget, focus on high-protein options like eggs, dal, or grilled chicken.' }])
     }
     setLoading(false)
     setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 100)
@@ -457,7 +437,7 @@ export default function Food() {
     <div className="flex flex-col flex-1 overflow-hidden">
       {/* Sub-tabs */}
       <div className="flex bg-white border-b border-stone-100 px-4 pt-12">
-        {[['log', 'Log'], ['consult', '🪔 Consult']].map(([id, label]) => (
+        {[['log', 'Log'], ['consult', 'Consult']].map(([id, label]) => (
           <button
             key={id}
             onClick={() => setSubTab(id)}
