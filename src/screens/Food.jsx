@@ -104,35 +104,44 @@ function FoodLogger({ onClose, onLog }) {
   const handleLookup = async () => {
     if (!input.trim()) return
     const qtyNum = parseFloat(qty) || 1
-    const query = qtyNum !== 1 ? `${qtyNum} ${input.trim()}` : input.trim()
+    const query = input.trim()
 
     setLoading(true)
     setResult(null)
     setMode(null)
     try {
-      // 1. Try CalorieNinjas
-      const cn = await lookupCalorieNinjas(query)
+      // 1. Try local database first
+      const local = parseFood(query, qtyNum)
+      if (local) {
+        setResult({ name: local.name, kcal: local.kcal, protein: local.protein, carbs: local.carbs, fat: local.fat, source: 'db' })
+        setMode('found')
+        setLoading(false)
+        return
+      }
+      // 2. Try CalorieNinjas (if key set)
+      const cnQuery = qtyNum !== 1 ? `${qtyNum} ${query}` : query
+      const cn = await lookupCalorieNinjas(cnQuery)
       if (cn) {
         setResult({ ...cn, source: 'db' })
         setMode('found')
         setLoading(false)
         return
       }
-      // 2. Fallback: AI estimate
-      const ai = await aiEstimateNutrition(query)
+      // 3. AI estimate
+      const ai = await aiEstimateNutrition(qtyNum !== 1 ? `${qtyNum} ${query}` : query)
       if (ai) {
-        setResult({ name: ai.name || input.trim(), kcal: Math.round(ai.kcal), protein: ai.protein, carbs: ai.carbs || 0, fat: ai.fat || 0, source: 'ai' })
+        setResult({ name: ai.name || query, kcal: Math.round(ai.kcal * qtyNum), protein: Math.round(ai.protein * qtyNum * 10) / 10, carbs: Math.round(ai.carbs * qtyNum) || 0, fat: Math.round(ai.fat * qtyNum) || 0, source: 'ai' })
         setMode('found')
         setLoading(false)
         return
       }
-      // 3. Manual fallback
-      setCustomName(input.trim())
+      // 4. Manual fallback
+      setCustomName(query)
       setCustomKcal('')
       setCustomProtein('')
       setMode('manual')
     } catch {
-      setCustomName(input.trim())
+      setCustomName(query)
       setCustomKcal('')
       setCustomProtein('')
       setMode('manual')
