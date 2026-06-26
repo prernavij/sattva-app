@@ -4,15 +4,35 @@ import ProgressBar from '../components/ProgressBar'
 import DiyaLogo from '../components/DiyaLogo'
 
 const ACTIVITIES = [
-  { id: 'run', label: 'Run', icon: '🏃', met: 8, benefit: 'Boosts cardiovascular health and burns calories efficiently.' },
-  { id: 'walk', label: 'Walk', icon: '🚶', met: 3.5, benefit: 'Low impact, great for active recovery and mental clarity.' },
-  { id: 'strength', label: 'Strength', icon: '🏋️', met: 5, benefit: 'Builds muscle and increases resting metabolic rate.' },
-  { id: 'yoga', label: 'Yoga', icon: '🧘', met: 2.5, benefit: 'Improves flexibility, balance, and reduces stress cortisol.' },
-  { id: 'cycle', label: 'Cycle', icon: '🚴', met: 7, benefit: 'Great cardio that\'s easy on joints with high calorie burn.' },
-  { id: 'swim', label: 'Swim', icon: '🏊', met: 7, benefit: 'Full-body workout with excellent recovery benefits.' },
-  { id: 'hiit', label: 'HIIT', icon: '⚡', met: 9, benefit: 'Maximises calorie burn and metabolic boost in short time.' },
-  { id: 'dance', label: 'Dance', icon: '💃', met: 5, benefit: 'Fun way to improve coordination and cardiovascular fitness.' },
+  { id: 'run',      label: 'Run',      icon: '🏃', met: 8,   type: 'cardio',
+    goalLinks: { lose_fat: 'Burns fat efficiently', improve_endurance: 'Core endurance builder', maintain_weight: 'Great for staying active' } },
+  { id: 'walk',     label: 'Walk',     icon: '🚶', met: 3.5, type: 'cardio',
+    goalLinks: { lose_fat: 'Gentle, sustainable burn', improve_endurance: 'Builds base fitness', maintain_weight: 'Ideal daily movement', manage_stress: 'Clears the mind' } },
+  { id: 'strength', label: 'Strength', icon: '🏋️', met: 5,   type: 'strength',
+    goalLinks: { build_strength: 'Directly builds muscle', lose_fat: 'Raises resting metabolism', maintain_weight: 'Preserves lean mass' } },
+  { id: 'yoga',     label: 'Yoga',     icon: '🧘', met: 2.5, type: 'recovery',
+    goalLinks: { manage_stress: 'Lowers cortisol', better_sleep: 'Improves sleep quality', improve_endurance: 'Builds flexibility & recovery' } },
+  { id: 'cycle',    label: 'Cycle',    icon: '🚴', met: 7,   type: 'cardio',
+    goalLinks: { lose_fat: 'High output, low joint impact', improve_endurance: 'Builds aerobic capacity', maintain_weight: 'Sustained cardio' } },
+  { id: 'swim',     label: 'Swim',     icon: '🏊', met: 7,   type: 'cardio',
+    goalLinks: { lose_fat: 'Full-body burn', improve_endurance: 'Top aerobic workout', build_strength: 'Builds upper body strength' } },
+  { id: 'hiit',     label: 'HIIT',     icon: '⚡', met: 9,   type: 'cardio',
+    goalLinks: { lose_fat: 'Maximises fat burn', improve_endurance: 'Boosts VO₂ max', build_strength: 'Functional strength gains' } },
+  { id: 'dance',    label: 'Dance',    icon: '💃', met: 5,   type: 'cardio',
+    goalLinks: { lose_fat: 'Fun, sustained movement', manage_stress: 'Lifts mood and energy', improve_endurance: 'Sustained cardio' } },
 ]
+
+function getContribution(actId, durationMin, userGoals) {
+  const act = ACTIVITIES.find(a => a.id === actId)
+  const type = act?.type || 'general'
+  const goalLinks = act?.goalLinks || {}
+  const matched = (userGoals || []).filter(g => goalLinks[g]).map(g => ({ goal: g, reason: goalLinks[g] }))
+  let weeklyLabel
+  if (type === 'strength') weeklyLabel = '+1 strength session'
+  else if (type === 'cardio') weeklyLabel = `+${durationMin} min cardio`
+  else weeklyLabel = '+1 active session'
+  return { matched, weeklyLabel, type }
+}
 
 const INTENSITIES = [
   { id: 'easy', label: 'Easy', multi: 0.8 },
@@ -37,14 +57,14 @@ function WeeklyGoalBar({ goals, profile, weekDaysWithActivity, weekStrengthSessi
     sub = `${weekStrengthSessions} strength · ${Math.round(weekCardioMin)}min cardio`
   } else if (hasStrength) {
     label = 'Strength sessions'; value = weekStrengthSessions; max = goals.workout_goal_week; unit = 'sessions'
-    sub = `${weekKcalBurned} kcal burned this week`
+    sub = `${weekDaysWithActivity} active day${weekDaysWithActivity !== 1 ? 's' : ''} this week`
   } else if (hasEndurance) {
     const target = goals.workout_goal_week * 45
     label = 'Cardio minutes'; value = Math.round(weekCardioMin); max = target; unit = 'min'
-    sub = `${weekDaysWithActivity} active days · ${weekKcalBurned} kcal burned`
+    sub = `${weekDaysWithActivity} active day${weekDaysWithActivity !== 1 ? 's' : ''} this week`
   } else {
     label = 'Active days'; value = weekDaysWithActivity; max = goals.workout_goal_week; unit = 'days'
-    sub = `${weekKcalBurned} kcal burned this week`
+    sub = `${weekStrengthSessions} strength · ${Math.round(weekCardioMin)} min cardio`
   }
 
   const pct = max > 0 ? Math.min((value / max) * 100, 100) : 0
@@ -67,7 +87,7 @@ function WeeklyGoalBar({ goals, profile, weekDaysWithActivity, weekStrengthSessi
 }
 
 function LogTab() {
-  const { profile, goals, activityLogs, addActivityLog, removeActivityLog, todayKcal,
+  const { profile, goals, activityLogs, addActivityLog, removeActivityLog,
     weekDaysWithActivity, weekStrengthSessions, weekCardioMin, weekKcalBurned } = useApp()
   const [activity, setActivity] = useState('walk')
   const [customActivity, setCustomActivity] = useState('')
@@ -87,7 +107,11 @@ function LogTab() {
   const kcalBurned = selectedAct && selectedInt && duration
     ? calcKcalBurned(selectedAct.met, selectedInt.multi, weightKg, parseFloat(duration) || 0)
     : 0
-  const netKcal = (goals.cal_goal - todayKcal) + kcalBurned
+  const userGoals = Array.isArray(profile.goals) ? profile.goals : []
+  const actIdForContrib = isCustom
+    ? (ACTIVITIES.find(a => a.label.toLowerCase() === customActivity.trim().toLowerCase())?.id || null)
+    : activity
+  const contrib = getContribution(actIdForContrib, parseFloat(duration) || 0, userGoals)
 
   const handleLog = () => {
     if (!duration || parseFloat(duration) <= 0) return
@@ -175,14 +199,30 @@ function LogTab() {
         </div>
       </div>
 
-      {/* Estimate */}
-      {kcalBurned > 0 && (
-        <div className="mt-4 bg-orange-50 rounded-xl px-4 py-3 border border-orange-100 flex items-center justify-between">
-          <p className="text-xs text-stone-500 flex-1">{selectedAct?.benefit}</p>
-          <div className="text-right shrink-0 ml-4">
-            <p className="text-base font-bold text-activity">~{kcalBurned} kcal</p>
-            <p className="text-[10px] text-stone-400">estimated burn</p>
+      {/* Goal contribution preview */}
+      {duration && parseFloat(duration) > 0 && (
+        <div className="mt-4 rounded-xl px-4 py-3 border" style={{ background: '#F5F7F3', borderColor: '#DDE4DA' }}>
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs font-semibold text-stone-500 uppercase tracking-wide">Contributes to</span>
+            <span className="text-xs text-stone-400">{contrib.weeklyLabel}</span>
           </div>
+          {contrib.matched.length > 0 ? (
+            <div className="flex flex-col gap-1.5">
+              {contrib.matched.map(({ goal, reason }) => {
+                const GOAL_ICONS = { lose_fat: '📉', build_strength: '💪', improve_endurance: '🏃', maintain_weight: '⚖️', better_sleep: '😴', manage_stress: '🧘', eat_healthier: '🥗' }
+                const GOAL_LABELS = { lose_fat: 'Lose fat', build_strength: 'Build strength', improve_endurance: 'Improve endurance', maintain_weight: 'Maintain weight', better_sleep: 'Better sleep', manage_stress: 'Manage stress', eat_healthier: 'Eat healthier' }
+                return (
+                  <div key={goal} className="flex items-center gap-2">
+                    <span className="text-sm">{GOAL_ICONS[goal]}</span>
+                    <span className="text-xs font-semibold text-green-primary">{GOAL_LABELS[goal]}</span>
+                    <span className="text-xs text-stone-400">— {reason}</span>
+                  </div>
+                )
+              })}
+            </div>
+          ) : (
+            <p className="text-xs text-stone-400">Counts as an active session toward your weekly goal</p>
+          )}
         </div>
       )}
 
@@ -210,19 +250,25 @@ function LogTab() {
         <div className="mt-6">
           <div className="flex justify-between items-center mb-2">
             <h3 className="text-xs font-semibold text-stone-400 uppercase tracking-wide">Today</h3>
-            <span className="text-xs text-stone-400">{totalMin} min · {totalKcalBurned} kcal</span>
+            <span className="text-xs text-stone-400">{totalMin} min total</span>
           </div>
           <div className="bg-white rounded-xl shadow-card overflow-hidden">
             {activityLogs.map(log => {
-              const act = ACTIVITIES.find(a => a.id === log.activity_type)
+              const act = ACTIVITIES.find(a => a.id === log.activity_type || a.label.toLowerCase() === log.activity_type?.toLowerCase())
+              const logContrib = getContribution(act?.id || null, log.duration_min, userGoals)
+              const topGoal = logContrib.matched[0]
+              const GOAL_ICONS = { lose_fat: '📉', build_strength: '💪', improve_endurance: '🏃', maintain_weight: '⚖️', better_sleep: '😴', manage_stress: '🧘', eat_healthier: '🥗' }
               return (
                 <div key={log.id} className="flex items-center px-4 py-3 border-b border-stone-50 last:border-0">
                   <span className="text-xl mr-3">{act?.icon || '🏃'}</span>
-                  <div className="flex-1">
+                  <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-stone-800">{act?.label || log.activity_type}</p>
-                    <p className="text-xs text-stone-400">{log.duration_min}min · {log.intensity} · {log.kcal_burned} kcal</p>
+                    <p className="text-xs text-stone-400">
+                      {log.duration_min} min · {logContrib.weeklyLabel}
+                      {topGoal ? <span className="ml-1">{GOAL_ICONS[topGoal.goal]} {topGoal.reason}</span> : ''}
+                    </p>
                   </div>
-                  <button onClick={() => removeActivityLog(log.id)} className="text-stone-300 hover:text-red-400 text-lg leading-none">×</button>
+                  <button onClick={() => removeActivityLog(log.id)} className="text-stone-300 hover:text-red-400 text-lg leading-none ml-2">×</button>
                 </div>
               )
             })}
