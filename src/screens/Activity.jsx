@@ -27,12 +27,19 @@ function calcKcalBurned(met, intensityMulti, weightKg, durationMin) {
 function LogTab() {
   const { profile, goals, activityLogs, addActivityLog, removeActivityLog, todayKcal } = useApp()
   const [activity, setActivity] = useState('walk')
+  const [customActivity, setCustomActivity] = useState('')
   const [duration, setDuration] = useState('30')
   const [intensity, setIntensity] = useState('moderate')
   const [notes, setNotes] = useState('')
 
   const weightKg = profile.weight_lbs / 2.2046
-  const selectedAct = ACTIVITIES.find(a => a.id === activity)
+
+  // If custom text is entered, use it; otherwise use chip selection
+  const isCustom = customActivity.trim().length > 0
+  const activityLabel = isCustom ? customActivity.trim() : (ACTIVITIES.find(a => a.id === activity)?.label || activity)
+  const selectedAct = isCustom
+    ? (ACTIVITIES.find(a => a.label.toLowerCase() === customActivity.trim().toLowerCase()) || { met: 5, benefit: 'General activity — calorie estimate based on moderate effort.' })
+    : ACTIVITIES.find(a => a.id === activity)
   const selectedInt = INTENSITIES.find(i => i.id === intensity)
   const kcalBurned = selectedAct && selectedInt && duration
     ? calcKcalBurned(selectedAct.met, selectedInt.multi, weightKg, parseFloat(duration) || 0)
@@ -42,13 +49,14 @@ function LogTab() {
   const handleLog = () => {
     if (!duration || parseFloat(duration) <= 0) return
     addActivityLog({
-      activity_type: activity,
+      activity_type: activityLabel,
       duration_min: parseFloat(duration),
       intensity,
       kcal_burned: kcalBurned,
       notes,
     })
     setDuration('30')
+    setCustomActivity('')
     setNotes('')
   }
 
@@ -64,21 +72,27 @@ function LogTab() {
           {ACTIVITIES.map(a => (
             <button
               key={a.id}
-              onClick={() => setActivity(a.id)}
+              onClick={() => { setActivity(a.id); setCustomActivity('') }}
               className="flex flex-col items-center py-3 rounded-xl border-2 transition-all active:scale-95"
               style={{
-                borderColor: activity === a.id ? '#3D5240' : '#E5E7EB',
-                background: activity === a.id ? '#FDF1E8' : '#fff',
+                borderColor: !isCustom && activity === a.id ? '#3D5240' : '#E5E7EB',
+                background: !isCustom && activity === a.id ? '#FDF1E8' : '#fff',
               }}
             >
               <span className="text-xl">{a.icon}</span>
               <span className="text-[11px] font-medium mt-1"
-                style={{ color: activity === a.id ? '#3D5240' : '#9CA3AF' }}>
+                style={{ color: !isCustom && activity === a.id ? '#3D5240' : '#9CA3AF' }}>
                 {a.label}
               </span>
             </button>
           ))}
         </div>
+        <input
+          className="w-full mt-2 border border-stone-200 rounded-xl px-4 py-2.5 text-sm focus:border-activity"
+          placeholder="Or type any activity — pilates, cricket, martial arts…"
+          value={customActivity}
+          onChange={e => setCustomActivity(e.target.value)}
+        />
       </div>
 
       {/* Duration + Intensity */}
