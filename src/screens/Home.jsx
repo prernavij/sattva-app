@@ -268,6 +268,17 @@ export default function Home({ onNavigate }) {
           </div>
         </div>
 
+        {/* Coming soon — social */}
+        <div className="rounded-2xl p-4 border border-dashed border-stone-200"
+          style={{ background: 'linear-gradient(135deg, #F5F7F3 0%, #EFF0EB 100%)' }}>
+          <div className="flex items-center gap-2 mb-2">
+            <span className="text-base">👨‍👩‍👧</span>
+            <span className="text-xs font-semibold uppercase tracking-wide" style={{ color: '#3D5240' }}>Coming Soon</span>
+          </div>
+          <p className="text-sm font-semibold text-stone-700 mb-1">Connect with family & friends</p>
+          <p className="text-xs text-stone-400 leading-relaxed">Share challenges, cheer each other on, and build healthy habits together.</p>
+        </div>
+
         {/* Bottom spacer */}
         <div className="h-2" />
       </div>
