@@ -48,7 +48,26 @@ export default function Profile() {
   }
 
   const ACTIVITY_LABELS = { sedentary: 'Sedentary', light: 'Light', moderate: 'Moderate', active: 'Active', very_active: 'Very Active' }
-  const GOAL_LABELS = { lose: 'Lose Weight', recomp: 'Lose & Build', maintain: 'Maintain', build: 'Build Muscle' }
+  const GOAL_OPTIONS = [
+    { id: 'lose_fat',          label: 'Lose fat',           icon: '📉', computable: true },
+    { id: 'build_strength',    label: 'Build strength',     icon: '💪', computable: true },
+    { id: 'improve_endurance', label: 'Improve endurance',  icon: '🏃', computable: true },
+    { id: 'maintain_weight',   label: 'Maintain weight',    icon: '⚖️', computable: true },
+    { id: 'better_sleep',      label: 'Better sleep',       icon: '😴', computable: true },
+    { id: 'manage_stress',     label: 'Manage stress',      icon: '🧘', computable: false },
+    { id: 'eat_healthier',     label: 'Eat healthier',      icon: '🥗', computable: false },
+  ]
+  const toggleGoalEdit = (id) => {
+    setEditForm(f => {
+      const goals = Array.isArray(f.goals) ? f.goals : ['maintain_weight']
+      const has = goals.includes(id)
+      let next = has ? goals.filter(g => g !== id) : [...goals, id]
+      if (!has && id === 'maintain_weight') next = ['maintain_weight']
+      if (!has && id !== 'maintain_weight') next = next.filter(g => g !== 'maintain_weight')
+      if (next.length === 0) next = ['maintain_weight']
+      return { ...f, goals: next }
+    })
+  }
 
   return (
     <div className="flex flex-col flex-1 overflow-hidden">
@@ -122,7 +141,7 @@ export default function Profile() {
             </div>
 
             {/* Weight goal card — separate from daily targets */}
-            {goals.target_weight_lbs && profile.goal !== 'maintain' && (
+            {goals.target_weight_lbs && (Array.isArray(profile.goals) ? profile.goals : []).some(g => ['lose_fat','build_strength'].includes(g)) && (
               <div className="bg-white rounded-2xl p-4 shadow-card mb-5">
                 <div className="flex justify-between items-center mb-3">
                   <h2 className="text-sm font-semibold text-stone-700">Weight goal</h2>
@@ -203,14 +222,34 @@ export default function Profile() {
                     </div>
                   )}
                   <div>
-                    <label className="text-xs text-stone-500 block mb-1">Goal</label>
-                    <select
+                    <label className="text-xs text-stone-500 block mb-2">Goals</label>
+                    <div className="grid grid-cols-2 gap-2">
+                      {GOAL_OPTIONS.map(g => {
+                        const editGoals = Array.isArray(editForm.goals) ? editForm.goals : ['maintain_weight']
+                        const on = editGoals.includes(g.id)
+                        return (
+                          <button
+                            key={g.id}
+                            type="button"
+                            onClick={() => toggleGoalEdit(g.id)}
+                            className="flex items-center gap-2 px-3 py-2.5 rounded-xl border-2 transition-all text-left"
+                            style={{ borderColor: on ? '#3D5240' : '#E5E7EB', background: on ? '#E2EAE0' : '#fff' }}
+                          >
+                            <span className="text-lg">{g.icon}</span>
+                            <span className="text-xs font-medium text-stone-700 leading-tight">{g.label}</span>
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-xs text-stone-500 block mb-1">Anything else?</label>
+                    <input
                       className="w-full border border-stone-200 rounded-xl px-3 py-2.5 text-sm bg-white"
-                      value={editForm.goal}
-                      onChange={e => set('goal', e.target.value)}
-                    >
-                      {Object.entries(GOAL_LABELS).map(([k,v]) => <option key={k} value={k}>{v}</option>)}
-                    </select>
+                      placeholder="Custom goal notes…"
+                      value={editForm.goal_notes || ''}
+                      onChange={e => set('goal_notes', e.target.value)}
+                    />
                   </div>
                   <div>
                     <label className="text-xs text-stone-500 block mb-1">Activity level</label>
@@ -235,8 +274,22 @@ export default function Profile() {
             {/* Stats */}
             <div className="bg-white rounded-2xl p-4 shadow-card">
               <h3 className="text-sm font-semibold text-stone-700 mb-3">About</h3>
+              <div className="flex justify-between py-2 border-b border-stone-50">
+                <span className="text-sm text-stone-500">Goals</span>
+                <div className="flex flex-wrap gap-1 justify-end max-w-[60%]">
+                  {(Array.isArray(profile.goals) ? profile.goals : ['maintain_weight']).map(gid => {
+                    const opt = GOAL_OPTIONS.find(o => o.id === gid)
+                    return opt ? <span key={gid} className="text-xs px-2 py-0.5 rounded-full font-medium" style={{ background: '#E2EAE0', color: '#3D5240' }}>{opt.icon} {opt.label}</span> : null
+                  })}
+                </div>
+              </div>
+              {profile.goal_notes?.trim() && (
+                <div className="flex justify-between py-2 border-b border-stone-50">
+                  <span className="text-sm text-stone-500">Notes</span>
+                  <span className="text-sm text-stone-600 max-w-[60%] text-right">{profile.goal_notes}</span>
+                </div>
+              )}
               {[
-                { label: 'Goal', value: GOAL_LABELS[profile.goal] },
                 { label: 'Activity', value: ACTIVITY_LABELS[profile.activity_level] },
                 { label: 'Sex', value: profile.sex === 'female' ? 'Female' : 'Male' },
               ].map(s => (

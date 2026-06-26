@@ -10,11 +10,14 @@ const ACTIVITY_LEVELS = [
   { id: 'very_active', label: 'Very Active', desc: 'Physical job + exercise' },
 ]
 
-const GOALS = [
-  { id: 'lose', label: 'Lose Weight', icon: '📉', desc: 'Calorie deficit (-300 kcal)' },
-  { id: 'recomp', label: 'Lose & Build', icon: '🔥', desc: 'Recomp: slight deficit, high protein' },
-  { id: 'maintain', label: 'Maintain', icon: '⚖️', desc: 'TDEE = calories' },
-  { id: 'build', label: 'Build Muscle', icon: '💪', desc: 'Calorie surplus (+200 kcal)' },
+const GOAL_OPTIONS = [
+  { id: 'lose_fat',          label: 'Lose fat',           icon: '📉', computable: true,  desc: 'Calorie deficit, preserve muscle' },
+  { id: 'build_strength',    label: 'Build strength',     icon: '💪', computable: true,  desc: 'Higher protein & workout target' },
+  { id: 'improve_endurance', label: 'Improve endurance',  icon: '🏃', computable: true,  desc: 'More cardio-focused sessions' },
+  { id: 'maintain_weight',   label: 'Maintain weight',    icon: '⚖️', computable: true,  desc: 'Eat at TDEE' },
+  { id: 'better_sleep',      label: 'Better sleep',       icon: '😴', computable: true,  desc: 'Raises sleep target to 9h' },
+  { id: 'manage_stress',     label: 'Manage stress',      icon: '🧘', computable: false, desc: 'Mindfulness & recovery focus' },
+  { id: 'eat_healthier',     label: 'Eat healthier',      icon: '🥗', computable: false, desc: 'Food quality & habit awareness' },
 ]
 
 const TRACK_OPTIONS = [
@@ -34,7 +37,8 @@ export default function Onboarding() {
     height_ft: '', height_in: '', weight_lbs: '',
     target_weight_lbs: '',
     activity_level: 'moderate',
-    goal: 'maintain',
+    goals: ['maintain_weight'],
+    goal_notes: '',
     track: { calories: true, protein: true, water: true, sleep: true, workouts: true, weight: false },
   })
 
@@ -54,13 +58,29 @@ export default function Onboarding() {
     weight_lbs: parseFloat(form.weight_lbs) || 140,
     target_weight_lbs: parseFloat(form.target_weight_lbs) || null,
     activity_level: form.activity_level,
-    goal: form.goal,
+    goals: form.goals,
+    goal_notes: form.goal_notes,
     track: form.track,
   }
+
+  const toggleGoal = (id) => {
+    setForm(f => {
+      const has = f.goals.includes(id)
+      // mutually exclusive: maintain_weight vs lose_fat/build_strength
+      let next = has ? f.goals.filter(g => g !== id) : [...f.goals, id]
+      if (!has && id === 'maintain_weight') next = ['maintain_weight']
+      if (!has && id !== 'maintain_weight') next = next.filter(g => g !== 'maintain_weight')
+      return { ...f, goals: next }
+    })
+  }
+
+  const hasComputableGoal = form.goals.some(g => GOAL_OPTIONS.find(o => o.id === g)?.computable)
+  const showNotesWarning = form.goal_notes.trim().length > 0 && !hasComputableGoal
   const goals = calcGoals(profile)
 
   const canNext = () => {
     if (step === 1) return form.name && form.age && form.weight_lbs
+    if (step === 2) return form.goals.length > 0 && !showNotesWarning
     return true
   }
 
@@ -207,34 +227,53 @@ export default function Onboarding() {
           </div>
         )}
 
-        {/* Step 2: Goal */}
+        {/* Step 2: Goals */}
         {step === 2 && (
-          <div className="flex flex-col gap-6">
+          <div className="flex flex-col gap-5">
             <div>
-              <h2 className="font-serif text-2xl text-green-primary mb-1">Your primary goal</h2>
-              <p className="text-stone-500 text-sm">This shapes your calorie and protein targets.</p>
+              <h2 className="font-serif text-2xl text-green-primary mb-1">Your goals</h2>
+              <p className="text-stone-500 text-sm">Choose as many as you like. We'll set your targets accordingly.</p>
             </div>
-            <div className="flex flex-col gap-3">
-              {GOALS.map(g => (
-                <button
-                  key={g.id}
-                  onClick={() => set('goal', g.id)}
-                  className="flex items-center gap-4 px-5 py-4 rounded-2xl border-2 transition-all text-left"
-                  style={{
-                    borderColor: form.goal === g.id ? '#3D5240' : '#E5E7EB',
-                    background: form.goal === g.id ? '#E2EAE0' : '#fff',
-                  }}
-                >
-                  <span className="text-3xl">{g.icon}</span>
-                  <div>
-                    <div className="font-semibold text-stone-800">{g.label}</div>
-                    <div className="text-xs text-stone-500 mt-0.5">{g.desc}</div>
-                  </div>
-                </button>
-              ))}
+            <div className="grid grid-cols-2 gap-3">
+              {GOAL_OPTIONS.map(g => {
+                const on = form.goals.includes(g.id)
+                return (
+                  <button
+                    key={g.id}
+                    onClick={() => toggleGoal(g.id)}
+                    className="flex flex-col items-start gap-1.5 px-4 py-3.5 rounded-2xl border-2 transition-all text-left"
+                    style={{
+                      borderColor: on ? '#3D5240' : '#E5E7EB',
+                      background: on ? '#E2EAE0' : '#fff',
+                    }}
+                  >
+                    <span className="text-2xl">{g.icon}</span>
+                    <div className="font-semibold text-stone-800 text-sm leading-tight">{g.label}</div>
+                    <div className="text-xs text-stone-400 leading-tight">{g.desc}</div>
+                    {!g.computable && <span className="text-[10px] text-stone-400 bg-stone-100 px-1.5 py-0.5 rounded-full">tracked only</span>}
+                  </button>
+                )
+              })}
             </div>
 
-            {form.goal !== 'maintain' && (
+            <div>
+              <label className="text-sm font-medium text-stone-600 block mb-1.5">
+                Anything else? <span className="text-stone-400 font-normal">— optional</span>
+              </label>
+              <input
+                className="w-full border border-stone-200 rounded-xl px-4 py-3 text-sm bg-white focus:border-green-primary transition-colors"
+                placeholder="e.g. train for a half marathon, improve posture…"
+                value={form.goal_notes}
+                onChange={e => set('goal_notes', e.target.value)}
+              />
+              {showNotesWarning && (
+                <p className="text-xs text-amber-600 mt-1.5">
+                  We can't compute targets from this alone — please also pick at least one goal above.
+                </p>
+              )}
+            </div>
+
+            {(form.goals.includes('lose_fat') || form.goals.includes('build_strength')) && (
               <div>
                 <label className="text-sm font-medium text-stone-600 block mb-1.5">
                   Target weight (lbs) <span className="text-stone-400 font-normal">— optional</span>
@@ -242,7 +281,7 @@ export default function Onboarding() {
                 <input
                   type="number"
                   className="w-full border border-stone-200 rounded-xl px-4 py-3 text-base focus:border-green-primary transition-colors"
-                  placeholder={form.goal === 'build' ? 'e.g. 160' : 'e.g. 130'}
+                  placeholder={form.goals.includes('build_strength') && !form.goals.includes('lose_fat') ? 'e.g. 160' : 'e.g. 130'}
                   value={form.target_weight_lbs}
                   onChange={e => set('target_weight_lbs', e.target.value)}
                 />
@@ -298,10 +337,18 @@ export default function Onboarding() {
               <p className="text-stone-500 text-sm">Calculated from your profile using Mifflin-St Jeor formula.</p>
             </div>
 
+            <div className="flex flex-wrap gap-2 mb-1">
+              {form.goals.map(gid => {
+                const opt = GOAL_OPTIONS.find(o => o.id === gid)
+                return opt ? <span key={gid} className="text-xs px-3 py-1 rounded-full font-medium" style={{ background: '#E2EAE0', color: '#3D5240' }}>{opt.icon} {opt.label}</span> : null
+              })}
+              {form.goal_notes.trim() && <span className="text-xs px-3 py-1 rounded-full bg-stone-100 text-stone-600 font-medium">✏️ {form.goal_notes}</span>}
+            </div>
+
             <div className="bg-green-light rounded-2xl p-4 flex flex-col gap-3">
               {[
-                { label: 'Daily Calories', value: `${goals.cal_goal} kcal`, sub: `TDEE ${form.goal === 'lose' ? '– 300' : form.goal === 'recomp' ? '– 100' : form.goal === 'build' ? '+ 200' : ''}` },
-                { label: 'Protein', value: `${goals.protein_goal}g`, sub: `${form.goal === 'build' || form.goal === 'recomp' ? '2.2' : '1.6'}g per kg bodyweight` },
+                { label: 'Daily Calories', value: `${goals.cal_goal} kcal`, sub: goals.cal_offset === 0 ? 'at TDEE' : goals.cal_offset > 0 ? `TDEE + ${goals.cal_offset} kcal` : `TDEE – ${Math.abs(goals.cal_offset)} kcal` },
+                { label: 'Protein', value: `${goals.protein_goal}g`, sub: `${goals.protein_multiplier}g per kg bodyweight` },
                 { label: 'Water', value: `${goals.water_goal_l}L`, sub: `≈ ${goals.water_goal_cups} cups (250ml each)` },
                 { label: 'Sleep', value: `${goals.sleep_goal_h}h`, sub: 'Recommended for recovery' },
                 { label: 'Workouts', value: `${goals.workout_goal_week}×/week`, sub: 'Flexible around your schedule' },
@@ -316,7 +363,7 @@ export default function Onboarding() {
               ))}
             </div>
 
-            {goals.target_weight_lbs && form.goal !== 'maintain' && (
+            {goals.target_weight_lbs && (form.goals.includes('lose_fat') || form.goals.includes('build_strength')) && (
               <div className="bg-white border border-green-mid rounded-2xl p-4">
                 <div className="flex justify-between items-center mb-2">
                   <span className="text-sm font-semibold text-stone-700">Weight goal</span>

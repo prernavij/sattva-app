@@ -13,8 +13,16 @@ const DEFAULT_PROFILE = {
   weight_lbs: 140,
   target_weight_lbs: null,
   activity_level: 'moderate',
-  goal: 'maintain',
+  goals: ['maintain_weight'],
+  goal_notes: '',
   track: { calories: true, protein: true, water: true, sleep: true, workouts: true, weight: true },
+}
+
+function legacyToGoals(g) {
+  if (g === 'lose') return ['lose_fat']
+  if (g === 'build') return ['build_strength']
+  if (g === 'recomp') return ['lose_fat', 'build_strength']
+  return ['maintain_weight']
 }
 
 export function calcGoals(profile) {
@@ -28,17 +36,41 @@ export function calcGoals(profile) {
   const multipliers = { sedentary: 1.2, light: 1.375, moderate: 1.55, active: 1.725, very_active: 1.9 }
   const tdee = bmr * (multipliers[profile.activity_level] || 1.55)
 
-  const calGoal = profile.goal === 'lose' ? tdee - 300 : profile.goal === 'build' ? tdee + 200 : profile.goal === 'recomp' ? tdee - 100 : tdee
-  const proteinGoal = (profile.goal === 'build' || profile.goal === 'recomp') ? w_kg * 2.2 : w_kg * 1.6
+  const activeGoals = Array.isArray(profile.goals) && profile.goals.length
+    ? profile.goals
+    : legacyToGoals(profile.goal)
+
+  const has = (id) => activeGoals.includes(id)
+  const loseFat       = has('lose_fat')
+  const buildStrength = has('build_strength')
+  const endurance     = has('improve_endurance')
+  const betterSleep   = has('better_sleep')
+
+  let calOffset = 0
+  if (loseFat && buildStrength)      calOffset = -100
+  else if (loseFat && endurance)     calOffset = -150
+  else if (loseFat)                  calOffset = -300
+  else if (buildStrength && endurance) calOffset = 100
+  else if (buildStrength)            calOffset = 200
+
+  let proteinMultiplier = 1.6
+  if (buildStrength)              proteinMultiplier = 2.2
+  else if (endurance || loseFat)  proteinMultiplier = 1.8
+
+  let workoutGoal = 4
+  if (buildStrength && endurance) workoutGoal = 6
+  else if (buildStrength || endurance) workoutGoal = 5
+
+  const calGoal = tdee + calOffset
+  const proteinGoal = w_kg * proteinMultiplier
   const waterGoal_l = (w_kg * 35) / 1000
   const waterGoal_cups = waterGoal_l / 0.25
 
   let weeks_to_goal = null
   const tw = parseFloat(profile.target_weight_lbs)
-  if (tw && tw > 0 && profile.goal !== 'maintain' && profile.goal !== 'build') {
+  if (tw && tw > 0 && (loseFat || buildStrength) && Math.abs(calOffset) > 0) {
     const diff = Math.abs(profile.weight_lbs - tw)
-    const dailyDelta = profile.goal === 'lose' ? 300 : profile.goal === 'recomp' ? 100 : 200
-    weeks_to_goal = Math.round((diff * 3500) / (dailyDelta * 7))
+    weeks_to_goal = Math.round((diff * 3500) / (Math.abs(calOffset) * 7))
   }
 
   return {
@@ -46,10 +78,12 @@ export function calcGoals(profile) {
     protein_goal: Math.round(proteinGoal),
     water_goal_l: Math.round(waterGoal_l * 10) / 10,
     water_goal_cups: Math.round(waterGoal_cups),
-    sleep_goal_h: 8,
-    workout_goal_week: profile.goal === 'build' || profile.goal === 'recomp' ? 5 : 4,
+    sleep_goal_h: betterSleep ? 9 : 8,
+    workout_goal_week: workoutGoal,
     weeks_to_goal,
     target_weight_lbs: tw || null,
+    cal_offset: calOffset,
+    protein_multiplier: proteinMultiplier,
   }
 }
 
@@ -133,6 +167,13 @@ export function AppProvider({ children }) {
 
     if (prof) {
       profileIdRef.current = prof.id
+      let goalsArray
+      try {
+        const parsed = JSON.parse(prof.goal)
+        goalsArray = Array.isArray(parsed) ? parsed : legacyToGoals(prof.goal)
+      } catch {
+        goalsArray = legacyToGoals(prof.goal)
+      }
       const mapped = {
         name: prof.name,
         age: prof.age,
@@ -141,7 +182,8 @@ export function AppProvider({ children }) {
         weight_lbs: prof.weight_lbs,
         target_weight_lbs: prof.track?.target_weight_lbs || null,
         activity_level: prof.activity_level,
-        goal: prof.goal,
+        goals: goalsArray,
+        goal_notes: prof.track?.goal_notes || '',
         track: prof.track || {},
       }
       setProfile(mapped)
@@ -218,8 +260,8 @@ export function AppProvider({ children }) {
       height_cm: prof.height_cm,
       weight_lbs: prof.weight_lbs,
       activity_level: prof.activity_level,
-      goal: prof.goal,
-      track: { ...prof.track, target_weight_lbs: prof.target_weight_lbs },
+      goal: JSON.stringify(prof.goals || ['maintain_weight']),
+      track: { ...prof.track, target_weight_lbs: prof.target_weight_lbs, goal_notes: prof.goal_notes || '' },
       updated_at: new Date().toISOString(),
     }
     const { data } = await supabase.from('profiles').upsert(payload, { onConflict: 'user_id' }).select().single()
