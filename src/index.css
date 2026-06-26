@@ -1,0 +1,112 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+* {
+  -webkit-tap-highlight-color: transparent;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'DM Sans', system-ui, sans-serif;
+  background: #EFF0EB;
+  color: #1C1410;
+  margin: 0;
+  padding: 0;
+  overscroll-behavior: none;
+}
+
+/* Mobile shell — 390px centered on desktop */
+#root {
+  display: flex;
+  justify-content: center;
+  min-height: 100dvh;
+  background: #D4D8CE;
+}
+
+.app-shell {
+  width: 100%;
+  max-width: 390px;
+  min-height: 100dvh;
+  background: #EFF0EB;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* Hide scrollbar but keep scroll */
+.scrollable {
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.scrollable::-webkit-scrollbar { display: none; }
+
+/* Tab bar safe area */
+.tab-bar {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* Smooth transitions */
+.screen-enter {
+  animation: fadeSlideIn 0.2s ease-out;
+}
+
+@keyframes fadeSlideIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Notification banner */
+.notif-banner {
+  animation: slideDown 0.3s ease-out;
+}
+@keyframes slideDown {
+  from { transform: translateY(-100%); }
+  to   { transform: translateY(0); }
+}
+
+/* Progress bar */
+.progress-bar-fill {
+  transition: width 0.5s cubic-bezier(.4,0,.2,1);
+}
+
+/* Ring animation */
+@keyframes ring-progress {
+  from { stroke-dashoffset: 283; }
+}
+
+/* Cup fill animation */
+@keyframes fill-up {
+  from { transform: scaleY(0); }
+  to   { transform: scaleY(1); }
+}
+
+/* Celebration overlay */
+@keyframes popIn {
+  0%   { transform: scale(0.5); opacity: 0; }
+  70%  { transform: scale(1.1); }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.pop-in { animation: popIn 0.4s cubic-bezier(.4,0,.2,1) both; }
+
+/* Input focus */
+input:focus, textarea:focus, select:focus {
+  outline: none;
+}
+
+/* Bottom sheet */
+.bottom-sheet {
+  animation: sheetUp 0.25s cubic-bezier(.4,0,.2,1);
+}
+@keyframes sheetUp {
+  from { transform: translateY(100%); }
+  to   { transform: translateY(0); }
+}
+
+/* Chart bar */
+.chart-bar {
+  transition: height 0.4s cubic-bezier(.4,0,.2,1);
+}

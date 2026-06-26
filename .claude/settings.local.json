@@ -1,0 +1,24 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm create *)",
+      "Bash(npx create-vite@latest . --template react)",
+      "Bash(npm install *)",
+      "Bash(npm run *)",
+      "Bash(curl -s http://localhost:5173)",
+      "mcp__Claude_Preview__preview_start",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "Bash(xargs sed -i '' -e 's/#2D5A30/#4A5E44/g' -e 's/#EBF2EB/#EAE9DF/g' -e 's/#B8D4BA/#BEC9B7/g' -e 's/#5B8FB9/#5C8EA0/g' -e 's/#7B6FA8/#8878A0/g' -e 's/#E07A3A/#B87058/g' -e 's/#F4F4F2/#EDE8DF/g' -e 's/#FAFAFA/#F6F2EC/g')",
+      "Bash(xargs sed -i '' -e 's/#4A5E44/#C8784A/g' -e 's/#EAE9DF/#FBF0E8/g' -e 's/#BEC9B7/#E8D5C4/g' -e 's/#5C8EA0/#C8784A/g' -e 's/#8878A0/#C8784A/g' -e 's/#B87058/#C8784A/g' -e 's/#EDE8DF/#F0EAE1/g' -e 's/#F6F2EC/#FDFAF6/g' -e 's/#A09890/#B8AFA8/g')",
+      "Bash(xargs sed -i '' -e 's/#C8784A/#8B5E3C/g' -e 's/#FBF0E8/#F0E4D9/g' -e 's/#E8D5C4/#D4A88A/g' -e 's/#FDFAF6/#F2EDE6/g' -e 's/#F0EAE1/#E8DDD3/g' -e 's/#B8AFA8/#A89D94/g' -e 's/#1E1A17/#1C1410/g' -e 's/DM Sans/Inter/g')",
+      "mcp__visualize__read_me",
+      "mcp__visualize__show_widget",
+      "Bash(xargs sed -i '' -e 's/#8B5E3C/#3D5240/g' -e 's/#F0E4D9/#E2EAE0/g' -e 's/#D4A88A/#BDC9B6/g' -e 's/#F2EDE6/#EFF0EB/g' -e 's/#E8DDD3/#E4E7DF/g' -e 's/#A89D94/#8A9688/g' -e 's/#6B3F22/#263529/g' -e 's/#DDD6CC/#D4D8CE/g')",
+      "Bash(xargs sed -i '' \"s/'Inter', system-ui/'DM Sans', system-ui/g\")",
+      "Bash(curl -s http://localhost:5174)",
+      "Bash(git init *)",
+      "Bash(git add *)",
+      "Bash(git commit *)"
+    ]
+  }
+}

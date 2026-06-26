@@ -1,0 +1,20 @@
+<svg width="192" height="192" viewBox="0 0 192 192" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="192" height="192" rx="40" fill="#2D5A30"/>
+  <!-- Flame glow -->
+  <ellipse cx="96" cy="56" rx="16" ry="24" fill="#FFD166" opacity="0.4"/>
+  <!-- Flame -->
+  <path d="M96 32 C88 44 84 54 88 64 C90 68 93 71 96 71 C99 71 102 68 104 64 C108 54 104 44 96 32Z" fill="#FF9F1C"/>
+  <path d="M96 40 C93 48 91 54 93 61 C94 63 96 65 96 65 C96 65 98 63 99 61 C101 54 99 48 96 40Z" fill="#FFD166"/>
+  <!-- Wick -->
+  <rect x="94" y="69" width="4" height="10" rx="2" fill="#8B5E3C"/>
+  <!-- Diya body -->
+  <path d="M52 112 Q52 92 72 88 L96 86 L120 88 Q140 92 140 112 L134 130 Q128 140 96 140 Q64 140 58 130 Z" fill="#C17F3E"/>
+  <path d="M56 110 Q56 92 74 89 L96 88 L118 89 Q136 92 136 110 L130 128 Q124 136 96 136 Q68 136 62 128 Z" fill="#E8A04A"/>
+  <!-- Oil surface -->
+  <ellipse cx="96" cy="108" rx="32" ry="10" fill="#D4A017" opacity="0.6"/>
+  <!-- Spout -->
+  <path d="M136 100 Q154 96 156 108 Q154 118 136 114 Z" fill="#C17F3E"/>
+  <path d="M137 102 Q152 98 153 108 Q151 115 137 112 Z" fill="#E8A04A"/>
+  <!-- Base shadow -->
+  <ellipse cx="96" cy="141" rx="44" ry="8" fill="#00000020"/>
+</svg>
