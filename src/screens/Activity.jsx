@@ -158,7 +158,7 @@ function LogTab() {
         className="w-full mt-2.5 border-0 border-b border-stone-200 px-0 py-2 text-sm bg-transparent focus:outline-none focus:border-green-primary text-stone-700 placeholder-stone-300"
         placeholder="Or type any activity — pilates, cricket, martial arts…"
         value={customActivity}
-        onChange={e => setCustomActivity(e.target.value)}
+        onChange={e => { setCustomActivity(e.target.value); if (e.target.value.trim()) setActivity('') }}
       />
 
       {/* Duration + Intensity on one row */}
