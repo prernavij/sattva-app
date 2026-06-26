@@ -24,8 +24,51 @@ function calcKcalBurned(met, intensityMulti, weightKg, durationMin) {
   return Math.round(met * intensityMulti * weightKg * (durationMin / 60))
 }
 
+function WeeklyGoalBar({ goals, profile, weekDaysWithActivity, weekStrengthSessions, weekCardioMin, weekKcalBurned }) {
+  const activeGoals = Array.isArray(profile.goals) ? profile.goals : []
+  const hasStrength  = activeGoals.includes('build_strength')
+  const hasEndurance = activeGoals.includes('improve_endurance')
+  const hasLoseFat   = activeGoals.includes('lose_fat')
+
+  let label, value, max, unit, sub
+
+  if (hasStrength && hasEndurance) {
+    label = 'This week'; value = weekDaysWithActivity; max = goals.workout_goal_week; unit = 'sessions'
+    sub = `${weekStrengthSessions} strength · ${Math.round(weekCardioMin)}min cardio`
+  } else if (hasStrength) {
+    label = 'Strength sessions'; value = weekStrengthSessions; max = goals.workout_goal_week; unit = 'sessions'
+    sub = `${weekKcalBurned} kcal burned this week`
+  } else if (hasEndurance) {
+    const target = goals.workout_goal_week * 45
+    label = 'Cardio minutes'; value = Math.round(weekCardioMin); max = target; unit = 'min'
+    sub = `${weekDaysWithActivity} active days · ${weekKcalBurned} kcal burned`
+  } else {
+    label = 'Active days'; value = weekDaysWithActivity; max = goals.workout_goal_week; unit = 'days'
+    sub = `${weekKcalBurned} kcal burned this week`
+  }
+
+  const pct = max > 0 ? Math.min((value / max) * 100, 100) : 0
+  const done = value >= max
+
+  return (
+    <div className="px-4 py-3 border-b border-stone-100 bg-white">
+      <div className="flex justify-between items-baseline mb-1.5">
+        <span className="text-xs font-medium text-stone-500">{label}</span>
+        <span className="text-xs font-semibold" style={{ color: done ? '#3D5240' : '#1C1410' }}>
+          {value} <span className="text-stone-400 font-normal">/ {max} {unit}</span>
+        </span>
+      </div>
+      <div className="h-1.5 rounded-full overflow-hidden mb-1" style={{ background: '#E4E7DF' }}>
+        <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, background: done ? '#3D5240' : '#7A9E7E' }} />
+      </div>
+      <p className="text-[11px] text-stone-400">{sub}</p>
+    </div>
+  )
+}
+
 function LogTab() {
-  const { profile, goals, activityLogs, addActivityLog, removeActivityLog, todayKcal } = useApp()
+  const { profile, goals, activityLogs, addActivityLog, removeActivityLog, todayKcal,
+    weekDaysWithActivity, weekStrengthSessions, weekCardioMin, weekKcalBurned } = useApp()
   const [activity, setActivity] = useState('walk')
   const [customActivity, setCustomActivity] = useState('')
   const [duration, setDuration] = useState('30')
@@ -64,6 +107,10 @@ function LogTab() {
   const totalMin = activityLogs.reduce((s, a) => s + (a.duration_min || 0), 0)
 
   return (
+    <div className="flex-1 flex flex-col overflow-hidden">
+    <WeeklyGoalBar goals={goals} profile={profile}
+      weekDaysWithActivity={weekDaysWithActivity} weekStrengthSessions={weekStrengthSessions}
+      weekCardioMin={weekCardioMin} weekKcalBurned={weekKcalBurned} />
     <div className="flex-1 overflow-y-auto scrollable px-4 py-4">
       {/* Activity */}
       <div>
@@ -183,6 +230,7 @@ function LogTab() {
         </div>
       )}
       <div className="h-6" />
+    </div>
     </div>
   )
 }

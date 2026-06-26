@@ -117,6 +117,7 @@ export function AppProvider({ children }) {
   const [waterLogs, setWaterLogs] = useState(() => loadLocal('sattva_water_' + TODAY(), []))
   const [sleepLogs, setSleepLogs] = useState(() => loadLocal('sattva_sleep_' + TODAY(), []))
   const [activityLogs, setActivityLogs] = useState(() => loadLocal('sattva_activity_' + TODAY(), []))
+  const [weekActivityLogs, setWeekActivityLogs] = useState(() => loadLocal('sattva_week_activity', []))
   const [bodyLogs, setBodyLogs] = useState(() => loadLocal('sattva_body', []))
   const [weekHistory, setWeekHistory] = useState(() => loadLocal('sattva_week', []))
   const [notifSettings, setNotifSettings] = useState(() => loadLocal('sattva_notif', {
@@ -192,14 +193,18 @@ export function AppProvider({ children }) {
       saveLocal('sattva_profile', mapped)
       saveLocal('sattva_onboarded', true)
 
-      // Load today's logs
+      // Load today's logs + this week's activity
       const today = TODAY()
-      const [food, water, sleep, activity, body] = await Promise.all([
+      const weekStart = (() => {
+        const d = new Date(); d.setDate(d.getDate() - d.getDay()); return d.toISOString().slice(0, 10)
+      })()
+      const [food, water, sleep, activity, body, weekAct] = await Promise.all([
         supabase.from('food_logs').select('*').eq('profile_id', prof.id).gte('logged_at', today),
         supabase.from('water_logs').select('*').eq('profile_id', prof.id).gte('logged_at', today),
         supabase.from('sleep_logs').select('*').eq('profile_id', prof.id).eq('date', today),
         supabase.from('activity_logs').select('*').eq('profile_id', prof.id).gte('logged_at', today),
         supabase.from('body_logs').select('*').eq('profile_id', prof.id).order('logged_at', { ascending: false }).limit(30),
+        supabase.from('activity_logs').select('*').eq('profile_id', prof.id).gte('logged_at', weekStart),
       ])
 
       if (food.data?.length) { setFoodLogs(food.data); saveLocal('sattva_food_' + today, food.data) }
@@ -207,6 +212,7 @@ export function AppProvider({ children }) {
       if (sleep.data?.length) { setSleepLogs(sleep.data); saveLocal('sattva_sleep_' + today, sleep.data) }
       if (activity.data?.length) { setActivityLogs(activity.data); saveLocal('sattva_activity_' + today, activity.data) }
       if (body.data?.length) { setBodyLogs(body.data); saveLocal('sattva_body', body.data) }
+      if (weekAct.data?.length) { setWeekActivityLogs(weekAct.data); saveLocal('sattva_week_activity', weekAct.data) }
     }
   }
 
@@ -245,6 +251,14 @@ export function AppProvider({ children }) {
   const todaySleep_h = lastSleep ? lastSleep.duration_h : 0
   const todayActivity_min = activityLogs.reduce((s, a) => s + (a.duration_min || 0), 0)
   const todayKcalBurned = activityLogs.reduce((s, a) => s + (a.kcal_burned || 0), 0)
+
+  // Weekly activity stats
+  const STRENGTH_TYPES = ['strength', 'hiit', 'Strength', 'HIIT']
+  const CARDIO_TYPES = ['run', 'cycle', 'swim', 'walk', 'Run', 'Cycle', 'Swim', 'Walk', 'Dance', 'dance']
+  const weekDaysWithActivity = new Set(weekActivityLogs.map(a => a.logged_at?.slice(0, 10))).size
+  const weekStrengthSessions = weekActivityLogs.filter(a => STRENGTH_TYPES.includes(a.activity_type) || a.activity_type?.toLowerCase().includes('strength') || a.activity_type?.toLowerCase().includes('hiit') || a.activity_type?.toLowerCase().includes('gym')).length
+  const weekCardioMin = weekActivityLogs.filter(a => !STRENGTH_TYPES.includes(a.activity_type)).reduce((s, a) => s + (a.duration_min || 0), 0)
+  const weekKcalBurned = weekActivityLogs.reduce((s, a) => s + (a.kcal_burned || 0), 0)
 
   // Supabase upsert helpers
   const getProfileId = () => profileIdRef.current
@@ -346,6 +360,11 @@ export function AppProvider({ children }) {
   const addActivityLog = useCallback(async (entry) => {
     const newEntry = { ...entry, id: Date.now(), logged_at: new Date().toISOString() }
     setActivityLogs(prev => [...prev, newEntry])
+    setWeekActivityLogs(prev => {
+      const next = [...prev, newEntry]
+      saveLocal('sattva_week_activity', next)
+      return next
+    })
     const pid = getProfileId()
     if (pid) {
       await supabase.from('activity_logs').insert({
@@ -361,6 +380,11 @@ export function AppProvider({ children }) {
 
   const removeActivityLog = useCallback(async (id) => {
     setActivityLogs(prev => prev.filter(a => a.id !== id))
+    setWeekActivityLogs(prev => {
+      const next = prev.filter(a => a.id !== id)
+      saveLocal('sattva_week_activity', next)
+      return next
+    })
     const pid = getProfileId()
     if (pid) await supabase.from('activity_logs').delete().eq('id', id).eq('profile_id', pid)
   }, [])
@@ -408,6 +432,7 @@ export function AppProvider({ children }) {
     todayKcal, todayProtein,
     todayWater_ml, todayWater_l, todayWater_cups,
     todaySleep_h, todayActivity_min, todayKcalBurned,
+    weekActivityLogs, weekDaysWithActivity, weekStrengthSessions, weekCardioMin, weekKcalBurned,
   }
 
   return <AppContext.Provider value={ctx}>{children}</AppContext.Provider>

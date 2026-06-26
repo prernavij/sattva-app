@@ -69,7 +69,7 @@ function MiniBarChart({ data, goal }) {
 export default function Home({ onNavigate }) {
   const {
     profile, goals,
-    todayKcal, todayProtein, todayWater_l, todaySleep_h, todayActivity_min,
+    todayKcal, todayProtein, todayWater_l, todaySleep_h, todayActivity_min, todayKcalBurned,
     activityLogs, bodyLogs, weekHistory, streak,
     insight, setInsight, lastInsightTone, setLastInsightTone,
   } = useApp()
@@ -100,7 +100,8 @@ export default function Home({ onNavigate }) {
   const avgKcal = Math.round(weekData.reduce((s,d)=>s+d.val,0) / weekData.filter(d=>d.val>0).length || 0)
   const goalsHit = weekData.filter(d => d.val >= goals.cal_goal * 0.85 && d.val <= goals.cal_goal * 1.15).length
 
-  const calPct = goals.cal_goal > 0 ? Math.min(Math.round((todayKcal / goals.cal_goal) * 100), 100) : 0
+  const netKcal = todayKcal - todayKcalBurned
+  const calPct = goals.cal_goal > 0 ? Math.min(Math.round((netKcal / goals.cal_goal) * 100), 100) : 0
 
   return (
     <div className="flex flex-col flex-1 overflow-hidden">
@@ -131,9 +132,11 @@ export default function Home({ onNavigate }) {
         {/* Calorie bar — big and satisfying */}
         <div>
           <div className="flex justify-between items-baseline mb-1.5">
-            <span className="text-xs font-medium" style={{ color: '#8A9688' }}>Calories today</span>
+            <span className="text-xs font-medium" style={{ color: '#8A9688' }}>
+              Net calories{todayKcalBurned > 0 ? <span className="ml-1 text-[10px]">({todayKcal} eaten − {todayKcalBurned} burned)</span> : ''}
+            </span>
             <span className="text-xs font-semibold" style={{ color: calPct >= 90 ? '#3D5240' : '#1C1410' }}>
-              {todayKcal} <span style={{ color: '#8A9688', fontWeight: 400 }}>/ {goals.cal_goal} kcal</span>
+              {netKcal} <span style={{ color: '#8A9688', fontWeight: 400 }}>/ {goals.cal_goal} kcal</span>
             </span>
           </div>
           <div className="h-2 rounded-full overflow-hidden" style={{ background: '#E4E7DF' }}>
