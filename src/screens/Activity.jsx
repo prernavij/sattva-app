@@ -114,27 +114,14 @@ function LogTab() {
         </div>
       </div>
 
-      {/* Benefit card */}
+      {/* Estimate */}
       {kcalBurned > 0 && (
-        <div className="mt-4 bg-orange-50 rounded-xl p-4 border border-orange-100">
-          <div className="grid grid-cols-3 gap-2 mb-2 text-center">
-            <div>
-              <p className="text-base font-bold text-activity">{kcalBurned}</p>
-              <p className="text-[10px] text-stone-500">kcal burned</p>
-            </div>
-            <div>
-              <p className="text-base font-bold text-green-primary">{netKcal}</p>
-              <p className="text-[10px] text-stone-500">net kcal</p>
-            </div>
-            <div>
-              <p className="text-base font-bold text-stone-600">{duration}min</p>
-              <p className="text-[10px] text-stone-500">duration</p>
-            </div>
+        <div className="mt-4 bg-orange-50 rounded-xl px-4 py-3 border border-orange-100 flex items-center justify-between">
+          <p className="text-xs text-stone-500 flex-1">{selectedAct?.benefit}</p>
+          <div className="text-right shrink-0 ml-4">
+            <p className="text-base font-bold text-activity">~{kcalBurned} kcal</p>
+            <p className="text-[10px] text-stone-400">estimated burn</p>
           </div>
-          <div className="inline-block bg-activity/10 text-activity text-xs font-semibold px-2 py-0.5 rounded-pill mb-2">
-            {netKcal > 0 ? 'Under budget' : 'At limit'}
-          </div>
-          <p className="text-xs text-stone-500">{selectedAct?.benefit}</p>
         </div>
       )}
 
