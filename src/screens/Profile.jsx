@@ -48,7 +48,7 @@ export default function Profile() {
   }
 
   const ACTIVITY_LABELS = { sedentary: 'Sedentary', light: 'Light', moderate: 'Moderate', active: 'Active', very_active: 'Very Active' }
-  const GOAL_LABELS = { lose: 'Lose Weight', maintain: 'Maintain', build: 'Build Muscle' }
+  const GOAL_LABELS = { lose: 'Lose Weight', recomp: 'Lose & Build', maintain: 'Maintain', build: 'Build Muscle' }
 
   return (
     <div className="flex flex-col flex-1 overflow-hidden">
@@ -128,7 +128,7 @@ export default function Profile() {
                   <h2 className="text-sm font-semibold text-stone-700">Weight goal</h2>
                   <span className="text-xs font-semibold px-2 py-0.5 rounded-pill"
                     style={{ background: '#3D524018', color: '#3D5240' }}>
-                    {profile.goal === 'lose' ? 'Lose weight' : 'Build muscle'}
+                    {GOAL_LABELS[profile.goal] || profile.goal}
                   </span>
                 </div>
                 {(() => {

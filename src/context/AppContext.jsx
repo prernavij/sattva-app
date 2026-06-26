@@ -28,16 +28,16 @@ export function calcGoals(profile) {
   const multipliers = { sedentary: 1.2, light: 1.375, moderate: 1.55, active: 1.725, very_active: 1.9 }
   const tdee = bmr * (multipliers[profile.activity_level] || 1.55)
 
-  const calGoal = profile.goal === 'lose' ? tdee - 300 : profile.goal === 'build' ? tdee + 200 : tdee
-  const proteinGoal = profile.goal === 'build' ? w_kg * 2.0 : w_kg * 1.6
+  const calGoal = profile.goal === 'lose' ? tdee - 300 : profile.goal === 'build' ? tdee + 200 : profile.goal === 'recomp' ? tdee - 100 : tdee
+  const proteinGoal = (profile.goal === 'build' || profile.goal === 'recomp') ? w_kg * 2.2 : w_kg * 1.6
   const waterGoal_l = (w_kg * 35) / 1000
   const waterGoal_cups = waterGoal_l / 0.25
 
   let weeks_to_goal = null
   const tw = parseFloat(profile.target_weight_lbs)
-  if (tw && tw > 0 && profile.goal !== 'maintain') {
+  if (tw && tw > 0 && profile.goal !== 'maintain' && profile.goal !== 'build') {
     const diff = Math.abs(profile.weight_lbs - tw)
-    const dailyDelta = profile.goal === 'lose' ? 300 : 200
+    const dailyDelta = profile.goal === 'lose' ? 300 : profile.goal === 'recomp' ? 100 : 200
     weeks_to_goal = Math.round((diff * 3500) / (dailyDelta * 7))
   }
 
@@ -47,7 +47,7 @@ export function calcGoals(profile) {
     water_goal_l: Math.round(waterGoal_l * 10) / 10,
     water_goal_cups: Math.round(waterGoal_cups),
     sleep_goal_h: 8,
-    workout_goal_week: 4,
+    workout_goal_week: profile.goal === 'build' || profile.goal === 'recomp' ? 5 : 4,
     weeks_to_goal,
     target_weight_lbs: tw || null,
   }

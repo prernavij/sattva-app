@@ -12,6 +12,7 @@ const ACTIVITY_LEVELS = [
 
 const GOALS = [
   { id: 'lose', label: 'Lose Weight', icon: '📉', desc: 'Calorie deficit (-300 kcal)' },
+  { id: 'recomp', label: 'Lose & Build', icon: '🔥', desc: 'Recomp: slight deficit, high protein' },
   { id: 'maintain', label: 'Maintain', icon: '⚖️', desc: 'TDEE = calories' },
   { id: 'build', label: 'Build Muscle', icon: '💪', desc: 'Calorie surplus (+200 kcal)' },
 ]
@@ -241,7 +242,7 @@ export default function Onboarding() {
                 <input
                   type="number"
                   className="w-full border border-stone-200 rounded-xl px-4 py-3 text-base focus:border-green-primary transition-colors"
-                  placeholder={form.goal === 'lose' ? 'e.g. 130' : 'e.g. 160'}
+                  placeholder={form.goal === 'build' ? 'e.g. 160' : 'e.g. 130'}
                   value={form.target_weight_lbs}
                   onChange={e => set('target_weight_lbs', e.target.value)}
                 />
@@ -299,8 +300,8 @@ export default function Onboarding() {
 
             <div className="bg-green-light rounded-2xl p-4 flex flex-col gap-3">
               {[
-                { label: 'Daily Calories', value: `${goals.cal_goal} kcal`, sub: `TDEE ${form.goal === 'lose' ? '– 300' : form.goal === 'build' ? '+ 200' : ''}` },
-                { label: 'Protein', value: `${goals.protein_goal}g`, sub: `${form.goal === 'build' ? '2.0' : '1.6'}g per kg bodyweight` },
+                { label: 'Daily Calories', value: `${goals.cal_goal} kcal`, sub: `TDEE ${form.goal === 'lose' ? '– 300' : form.goal === 'recomp' ? '– 100' : form.goal === 'build' ? '+ 200' : ''}` },
+                { label: 'Protein', value: `${goals.protein_goal}g`, sub: `${form.goal === 'build' || form.goal === 'recomp' ? '2.2' : '1.6'}g per kg bodyweight` },
                 { label: 'Water', value: `${goals.water_goal_l}L`, sub: `≈ ${goals.water_goal_cups} cups (250ml each)` },
                 { label: 'Sleep', value: `${goals.sleep_goal_h}h`, sub: 'Recommended for recovery' },
                 { label: 'Workouts', value: `${goals.workout_goal_week}×/week`, sub: 'Flexible around your schedule' },
