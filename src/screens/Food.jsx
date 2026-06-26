@@ -321,7 +321,7 @@ function ConsultTab() {
       }))
 
       const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key=${apiKey}`,
         {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
@@ -333,10 +333,15 @@ function ConsultTab() {
         }
       )
       const data = await response.json()
-      const reply = data.candidates?.[0]?.content?.parts?.[0]?.text || 'Sorry, I had trouble responding. Try again!'
-      setMessages(m => [...m, { role: 'assistant', text: reply }])
-    } catch {
-      setMessages(m => [...m, { role: 'assistant', text: 'Having trouble connecting. Based on your budget, focus on high-protein options like eggs, dal, or grilled chicken.' }])
+      if (!response.ok) {
+        const errMsg = data.error?.message || `API error ${response.status}`
+        setMessages(m => [...m, { role: 'assistant', text: `Error: ${errMsg}` }])
+      } else {
+        const reply = data.candidates?.[0]?.content?.parts?.[0]?.text || 'No response received.'
+        setMessages(m => [...m, { role: 'assistant', text: reply }])
+      }
+    } catch (e) {
+      setMessages(m => [...m, { role: 'assistant', text: `Connection error: ${e.message}` }])
     }
     setLoading(false)
     setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 100)
