@@ -93,7 +93,7 @@ export default function Onboarding() {
               <p className="text-stone-500 text-lg leading-relaxed">Your mindful wellness companion.<br/>Track. Reflect. Thrive.</p>
             </div>
             <div className="flex flex-col gap-3 text-stone-500 text-sm">
-              {['Personalised calorie & macro goals', 'Holistic daily insights', 'Indian + global food database', 'Smart hydration & sleep tracking'].map(f => (
+              {['Personalised calorie & macro goals', 'Holistic daily insights', 'Smart hydration & sleep tracking', 'Mindful activity & weight tracking'].map(f => (
                 <div key={f} className="flex items-center gap-2">
                   <div className="w-5 h-5 rounded-full bg-green-light flex items-center justify-center shrink-0">
                     <div className="w-2 h-2 rounded-full bg-green-primary" />

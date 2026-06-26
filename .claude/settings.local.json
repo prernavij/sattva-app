@@ -26,7 +26,8 @@
       "Bash(vercel --prod)",
       "Bash(vercel --prod --scope vijprerna-9312s-projects)",
       "Bash(vercel --prod --scope vijprerna-9312s-projects --name sattva-app)",
-      "Bash(brew install *)"
+      "Bash(brew install *)",
+      "Bash(vercel env *)"
     ]
   }
 }
