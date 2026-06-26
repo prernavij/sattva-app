@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { AppProvider, useApp } from './context/AppContext'
 import Onboarding from './screens/Onboarding'
+import Auth from './screens/Auth'
 import Home from './screens/Home'
 import Food from './screens/Food'
 import Water from './screens/Water'
@@ -12,12 +13,13 @@ import NotificationBanner from './components/NotificationBanner'
 import { useNotifications } from './hooks/useNotifications'
 
 function AppShell() {
-  const { onboarded } = useApp()
+  const { onboarded, user, handleAuth } = useApp()
   const [activeTab, setActiveTab] = useState('home')
   const [showSleep, setShowSleep] = useState(false)
 
   useNotifications()
 
+  if (!user) return <Auth onAuth={handleAuth} />
   if (!onboarded) return <Onboarding />
 
   const handleNavigate = (tab) => {
@@ -29,7 +31,6 @@ function AppShell() {
     <div className="app-shell">
       <NotificationBanner />
 
-      {/* Screens */}
       <div className="flex-1 flex flex-col overflow-hidden relative">
         {activeTab === 'home' && <Home key="home" onNavigate={handleNavigate} />}
         {activeTab === 'food' && <Food key="food" />}

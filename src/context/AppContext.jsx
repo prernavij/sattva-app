@@ -1,10 +1,10 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react'
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react'
+import { supabase } from '../lib/supabase'
 
 const AppContext = createContext(null)
 
 const TODAY = () => new Date().toISOString().slice(0, 10)
 
-// Default profile for demo mode
 const DEFAULT_PROFILE = {
   name: 'Friend',
   age: 28,
@@ -17,7 +17,6 @@ const DEFAULT_PROFILE = {
   track: { calories: true, protein: true, water: true, sleep: true, workouts: true, weight: true },
 }
 
-// Mifflin-St Jeor BMR → TDEE → goals
 export function calcGoals(profile) {
   const w_kg = profile.weight_lbs / 2.2046
   const h_cm = profile.height_cm
@@ -34,7 +33,6 @@ export function calcGoals(profile) {
   const waterGoal_l = (w_kg * 35) / 1000
   const waterGoal_cups = waterGoal_l / 0.25
 
-  // Estimated weeks to reach target weight (3500 kcal ≈ 1 lb fat)
   let weeks_to_goal = null
   const tw = parseFloat(profile.target_weight_lbs)
   if (tw && tw > 0 && profile.goal !== 'maintain') {
@@ -66,6 +64,11 @@ function saveLocal(key, val) {
 }
 
 export function AppProvider({ children }) {
+  // Auth
+  const [user, setUser] = useState(null)
+  const [authLoading, setAuthLoading] = useState(true)
+  const profileIdRef = useRef(null)
+
   const [onboarded, setOnboarded] = useState(() => loadLocal('sattva_onboarded', false))
   const [profile, setProfile] = useState(() => loadLocal('sattva_profile', DEFAULT_PROFILE))
   const [goals, setGoals] = useState(() => {
@@ -75,17 +78,12 @@ export function AppProvider({ children }) {
     return calcGoals(p)
   })
 
-  // Today's logs
   const [foodLogs, setFoodLogs] = useState(() => loadLocal('sattva_food_' + TODAY(), []))
   const [waterLogs, setWaterLogs] = useState(() => loadLocal('sattva_water_' + TODAY(), []))
   const [sleepLogs, setSleepLogs] = useState(() => loadLocal('sattva_sleep_' + TODAY(), []))
   const [activityLogs, setActivityLogs] = useState(() => loadLocal('sattva_activity_' + TODAY(), []))
   const [bodyLogs, setBodyLogs] = useState(() => loadLocal('sattva_body', []))
-
-  // Week history for charts
   const [weekHistory, setWeekHistory] = useState(() => loadLocal('sattva_week', []))
-
-  // Notification settings
   const [notifSettings, setNotifSettings] = useState(() => loadLocal('sattva_notif', {
     master_on: false,
     breakfast_on: true, breakfast_time: '08:00',
@@ -96,18 +94,89 @@ export function AppProvider({ children }) {
     bedtime_on: true, bedtime_time: '22:30',
     activity_nudge_on: true,
   }))
-
-  // Insight state
   const [insight, setInsight] = useState(null)
   const [lastInsightTone, setLastInsightTone] = useState(null)
-
-  // Streak
   const [streak, setStreak] = useState(() => loadLocal('sattva_streak', 1))
-
-  // In-app notification banner
   const [banner, setBanner] = useState(null)
 
-  // Persist on change
+  // Check for existing session on mount
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user) {
+        setUser(session.user)
+        loadFromSupabase(session.user.id)
+      }
+      setAuthLoading(false)
+    })
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session?.user) {
+        setUser(session.user)
+      } else {
+        setUser(null)
+        profileIdRef.current = null
+      }
+    })
+    return () => subscription.unsubscribe()
+  }, [])
+
+  const loadFromSupabase = async (userId) => {
+    // Load profile
+    const { data: prof } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('user_id', userId)
+      .single()
+
+    if (prof) {
+      profileIdRef.current = prof.id
+      const mapped = {
+        name: prof.name,
+        age: prof.age,
+        sex: prof.sex,
+        height_cm: prof.height_cm,
+        weight_lbs: prof.weight_lbs,
+        target_weight_lbs: prof.track?.target_weight_lbs || null,
+        activity_level: prof.activity_level,
+        goal: prof.goal,
+        track: prof.track || {},
+      }
+      setProfile(mapped)
+      setGoals(calcGoals(mapped))
+      setOnboarded(true)
+      saveLocal('sattva_profile', mapped)
+      saveLocal('sattva_onboarded', true)
+
+      // Load today's logs
+      const today = TODAY()
+      const [food, water, sleep, activity, body] = await Promise.all([
+        supabase.from('food_logs').select('*').eq('profile_id', prof.id).gte('logged_at', today),
+        supabase.from('water_logs').select('*').eq('profile_id', prof.id).gte('logged_at', today),
+        supabase.from('sleep_logs').select('*').eq('profile_id', prof.id).eq('date', today),
+        supabase.from('activity_logs').select('*').eq('profile_id', prof.id).gte('logged_at', today),
+        supabase.from('body_logs').select('*').eq('profile_id', prof.id).order('logged_at', { ascending: false }).limit(30),
+      ])
+
+      if (food.data?.length) { setFoodLogs(food.data); saveLocal('sattva_food_' + today, food.data) }
+      if (water.data?.length) { setWaterLogs(water.data); saveLocal('sattva_water_' + today, water.data) }
+      if (sleep.data?.length) { setSleepLogs(sleep.data); saveLocal('sattva_sleep_' + today, sleep.data) }
+      if (activity.data?.length) { setActivityLogs(activity.data); saveLocal('sattva_activity_' + today, activity.data) }
+      if (body.data?.length) { setBodyLogs(body.data); saveLocal('sattva_body', body.data) }
+    }
+  }
+
+  const handleAuth = useCallback(async (authUser) => {
+    setUser(authUser)
+    await loadFromSupabase(authUser.id)
+  }, [])
+
+  const signOut = useCallback(async () => {
+    await supabase.auth.signOut()
+    setUser(null)
+    profileIdRef.current = null
+  }, [])
+
+  // localStorage persistence
   useEffect(() => { saveLocal('sattva_onboarded', onboarded) }, [onboarded])
   useEffect(() => { saveLocal('sattva_profile', profile) }, [profile])
   useEffect(() => { saveLocal('sattva_goals', goals) }, [goals])
@@ -119,7 +188,7 @@ export function AppProvider({ children }) {
   useEffect(() => { saveLocal('sattva_notif', notifSettings) }, [notifSettings])
   useEffect(() => { saveLocal('sattva_streak', streak) }, [streak])
 
-  // Computed today totals
+  // Computed totals
   const todayKcal = foodLogs.reduce((s, f) => s + (f.kcal || 0), 0)
   const todayProtein = foodLogs.reduce((s, f) => s + (f.protein_g || 0), 0)
   const todayWater_ml = waterLogs.reduce((s, w) => s + (w.amount_ml || 0), 0)
@@ -130,53 +199,140 @@ export function AppProvider({ children }) {
   const todayActivity_min = activityLogs.reduce((s, a) => s + (a.duration_min || 0), 0)
   const todayKcalBurned = activityLogs.reduce((s, a) => s + (a.kcal_burned || 0), 0)
 
-  const completeOnboarding = useCallback((prof) => {
+  // Supabase upsert helpers
+  const getProfileId = () => profileIdRef.current
+
+  const syncProfileToSupabase = async (prof, userId) => {
+    const uid = userId || user?.id
+    if (!uid) return
+    const payload = {
+      user_id: uid,
+      name: prof.name,
+      age: prof.age,
+      sex: prof.sex,
+      height_cm: prof.height_cm,
+      weight_lbs: prof.weight_lbs,
+      activity_level: prof.activity_level,
+      goal: prof.goal,
+      track: { ...prof.track, target_weight_lbs: prof.target_weight_lbs },
+      updated_at: new Date().toISOString(),
+    }
+    const { data } = await supabase.from('profiles').upsert(payload, { onConflict: 'user_id' }).select().single()
+    if (data) profileIdRef.current = data.id
+  }
+
+  const completeOnboarding = useCallback(async (prof) => {
     const newGoals = calcGoals(prof)
     setProfile(prof)
     setGoals(newGoals)
     setOnboarded(true)
     setStreak(1)
-  }, [])
+    if (user) await syncProfileToSupabase(prof, user.id)
+  }, [user])
 
-  const updateProfile = useCallback((updates) => {
+  const updateProfile = useCallback(async (updates) => {
     setProfile(p => {
       const next = { ...p, ...updates }
-      const newGoals = calcGoals(next)
-      setGoals(newGoals)
+      setGoals(calcGoals(next))
+      if (user) syncProfileToSupabase(next)
       return next
     })
+  }, [user])
+
+  const addFoodLog = useCallback(async (entry) => {
+    const newEntry = { ...entry, id: Date.now(), logged_at: new Date().toISOString() }
+    setFoodLogs(prev => [...prev, newEntry])
+    const pid = getProfileId()
+    if (pid) {
+      await supabase.from('food_logs').insert({
+        profile_id: pid,
+        food_name: entry.food_name,
+        meal_type: entry.meal_type,
+        kcal: entry.kcal,
+        protein_g: entry.protein_g,
+        logged_at: newEntry.logged_at,
+      })
+    }
   }, [])
 
-  const addFoodLog = useCallback((entry) => {
-    setFoodLogs(prev => [...prev, { ...entry, id: Date.now(), logged_at: new Date().toISOString() }])
-  }, [])
-
-  const removeFoodLog = useCallback((id) => {
+  const removeFoodLog = useCallback(async (id) => {
     setFoodLogs(prev => prev.filter(f => f.id !== id))
+    const pid = getProfileId()
+    if (pid) await supabase.from('food_logs').delete().eq('id', id).eq('profile_id', pid)
   }, [])
 
-  const addWaterLog = useCallback((entry) => {
-    setWaterLogs(prev => [...prev, { ...entry, id: Date.now(), logged_at: new Date().toISOString() }])
+  const addWaterLog = useCallback(async (entry) => {
+    const newEntry = { ...entry, id: Date.now(), logged_at: new Date().toISOString() }
+    setWaterLogs(prev => [...prev, newEntry])
+    const pid = getProfileId()
+    if (pid) {
+      await supabase.from('water_logs').insert({
+        profile_id: pid,
+        amount_ml: entry.amount_ml,
+        logged_at: newEntry.logged_at,
+      })
+    }
   }, [])
 
-  const removeWaterLog = useCallback((id) => {
+  const removeWaterLog = useCallback(async (id) => {
     setWaterLogs(prev => prev.filter(w => w.id !== id))
+    const pid = getProfileId()
+    if (pid) await supabase.from('water_logs').delete().eq('id', id).eq('profile_id', pid)
   }, [])
 
-  const logSleep = useCallback((entry) => {
-    setSleepLogs(prev => [...prev, { ...entry, id: Date.now() }])
+  const logSleep = useCallback(async (entry) => {
+    const newEntry = { ...entry, id: Date.now() }
+    setSleepLogs(prev => [...prev, newEntry])
+    const pid = getProfileId()
+    if (pid) {
+      await supabase.from('sleep_logs').upsert({
+        profile_id: pid,
+        date: TODAY(),
+        duration_h: entry.duration_h,
+        bedtime: entry.bedtime,
+        wake_time: entry.wake_time,
+        quality: entry.quality,
+      }, { onConflict: 'profile_id,date' })
+    }
   }, [])
 
-  const addActivityLog = useCallback((entry) => {
-    setActivityLogs(prev => [...prev, { ...entry, id: Date.now(), logged_at: new Date().toISOString() }])
+  const addActivityLog = useCallback(async (entry) => {
+    const newEntry = { ...entry, id: Date.now(), logged_at: new Date().toISOString() }
+    setActivityLogs(prev => [...prev, newEntry])
+    const pid = getProfileId()
+    if (pid) {
+      await supabase.from('activity_logs').insert({
+        profile_id: pid,
+        activity_type: entry.activity_type,
+        duration_min: entry.duration_min,
+        intensity: entry.intensity,
+        kcal_burned: entry.kcal_burned,
+        logged_at: newEntry.logged_at,
+      })
+    }
   }, [])
 
-  const removeActivityLog = useCallback((id) => {
+  const removeActivityLog = useCallback(async (id) => {
     setActivityLogs(prev => prev.filter(a => a.id !== id))
+    const pid = getProfileId()
+    if (pid) await supabase.from('activity_logs').delete().eq('id', id).eq('profile_id', pid)
   }, [])
 
-  const addBodyLog = useCallback((entry) => {
-    setBodyLogs(prev => [...prev, { ...entry, id: Date.now(), logged_at: new Date().toISOString() }])
+  const addBodyLog = useCallback(async (entry) => {
+    const newEntry = { ...entry, id: Date.now(), logged_at: new Date().toISOString() }
+    setBodyLogs(prev => [...prev, newEntry])
+    const pid = getProfileId()
+    if (pid) {
+      await supabase.from('body_logs').insert({
+        profile_id: pid,
+        weight_lbs: entry.weight_lbs,
+        waist_in: entry.waist_in,
+        chest_in: entry.chest_in,
+        hips_in: entry.hips_in,
+        arms_in: entry.arms_in,
+        logged_at: newEntry.logged_at,
+      })
+    }
   }, [])
 
   const showBanner = useCallback((msg, type = 'info') => {
@@ -184,7 +340,10 @@ export function AppProvider({ children }) {
     setTimeout(() => setBanner(null), 7000)
   }, [])
 
+  if (authLoading) return null
+
   const ctx = {
+    user, handleAuth, signOut,
     onboarded, completeOnboarding,
     profile, updateProfile,
     goals,
