@@ -94,6 +94,7 @@ function LogTab() {
   const [duration, setDuration] = useState('30')
   const [intensity, setIntensity] = useState('moderate')
   const [notes, setNotes] = useState('')
+  const [showNotes, setShowNotes] = useState(false)
 
   const weightKg = profile.weight_lbs / 2.2046
 
@@ -125,6 +126,7 @@ function LogTab() {
     setDuration('30')
     setCustomActivity('')
     setNotes('')
+    setShowNotes(false)
   }
 
   const totalKcalBurned = activityLogs.reduce((s, a) => s + (a.kcal_burned || 0), 0)
@@ -136,105 +138,86 @@ function LogTab() {
       weekDaysWithActivity={weekDaysWithActivity} weekStrengthSessions={weekStrengthSessions}
       weekCardioMin={weekCardioMin} weekKcalBurned={weekKcalBurned} />
     <div className="flex-1 overflow-y-auto scrollable px-4 py-4">
-      {/* Activity */}
-      <div>
-        <p className="text-xs font-semibold text-stone-400 uppercase tracking-wide mb-2.5">Activity</p>
-        <div className="flex gap-2 overflow-x-auto scrollable pb-1 -mx-4 px-4">
-          {ACTIVITIES.map(a => {
-            const on = !isCustom && activity === a.id
-            return (
-              <button
-                key={a.id}
-                onClick={() => { setActivity(a.id); setCustomActivity('') }}
-                className="shrink-0 flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium transition-all"
-                style={{
-                  background: on ? '#3D5240' : '#E8EDE6',
-                  color: on ? '#fff' : '#5A6B5C',
-                }}
-              >
-                <span>{a.icon}</span>
-                <span>{a.label}</span>
-              </button>
-            )
-          })}
-        </div>
-        <input
-          className="w-full mt-3 border border-stone-200 rounded-xl px-4 py-2.5 text-sm focus:border-green-primary bg-white"
-          placeholder="Or type any activity — pilates, cricket, martial arts…"
-          value={customActivity}
-          onChange={e => setCustomActivity(e.target.value)}
-        />
+      {/* Activity pills */}
+      <div className="flex gap-2 overflow-x-auto scrollable pb-1 -mx-4 px-4">
+        {ACTIVITIES.map(a => {
+          const on = !isCustom && activity === a.id
+          return (
+            <button
+              key={a.id}
+              onClick={() => { setActivity(a.id); setCustomActivity('') }}
+              className="shrink-0 flex items-center gap-1.5 px-3.5 py-2 rounded-full text-sm font-medium transition-all"
+              style={{ background: on ? '#3D5240' : '#E8EDE6', color: on ? '#fff' : '#5A6B5C' }}
+            >
+              <span>{a.icon}</span><span>{a.label}</span>
+            </button>
+          )
+        })}
       </div>
+      <input
+        className="w-full mt-2.5 border-0 border-b border-stone-200 px-0 py-2 text-sm bg-transparent focus:outline-none focus:border-green-primary text-stone-700 placeholder-stone-300"
+        placeholder="Or type any activity — pilates, cricket, martial arts…"
+        value={customActivity}
+        onChange={e => setCustomActivity(e.target.value)}
+      />
 
-      {/* Duration + Intensity */}
-      <div className="grid grid-cols-2 gap-3 mt-4">
-        <div>
-          <p className="text-xs font-semibold text-stone-400 uppercase tracking-wide mb-2">Duration (min)</p>
+      {/* Duration + Intensity on one row */}
+      <div className="flex items-center gap-3 mt-4">
+        <div className="flex items-center gap-2 flex-1">
           <input
             type="number"
-            className="w-full border border-stone-200 rounded-xl px-4 py-3 text-base focus:border-activity"
+            className="w-20 border border-stone-200 rounded-xl px-3 py-2.5 text-base text-center focus:border-green-primary"
             value={duration}
             onChange={e => setDuration(e.target.value)}
             placeholder="30"
           />
+          <span className="text-sm text-stone-400">min</span>
         </div>
-        <div>
-          <p className="text-xs font-semibold text-stone-400 uppercase tracking-wide mb-2">Intensity</p>
-          <div className="flex flex-col gap-1.5">
-            {INTENSITIES.map(i => (
-              <button
-                key={i.id}
-                onClick={() => setIntensity(i.id)}
-                className="py-2 rounded-xl text-xs font-medium border-2 transition-all"
-                style={{
-                  borderColor: intensity === i.id ? '#3D5240' : '#E5E7EB',
-                  background: intensity === i.id ? '#FDF1E8' : '#fff',
-                  color: intensity === i.id ? '#3D5240' : '#9CA3AF',
-                }}
-              >
-                {i.label}
-              </button>
-            ))}
-          </div>
+        <div className="flex gap-1.5">
+          {INTENSITIES.map(i => (
+            <button
+              key={i.id}
+              onClick={() => setIntensity(i.id)}
+              className="px-3 py-2 rounded-full text-xs font-medium transition-all"
+              style={{
+                background: intensity === i.id ? '#3D5240' : '#E8EDE6',
+                color: intensity === i.id ? '#fff' : '#5A6B5C',
+              }}
+            >
+              {i.label}
+            </button>
+          ))}
         </div>
       </div>
 
-      {/* Goal contribution preview */}
-      {duration && parseFloat(duration) > 0 && (
-        <div className="mt-4 rounded-xl px-4 py-3 border" style={{ background: '#F5F7F3', borderColor: '#DDE4DA' }}>
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-semibold text-stone-500 uppercase tracking-wide">Contributes to</span>
-            <span className="text-xs text-stone-400">{contrib.weeklyLabel}</span>
-          </div>
-          {contrib.matched.length > 0 ? (
-            <div className="flex flex-col gap-1.5">
-              {contrib.matched.map(({ goal, reason }) => {
-                const GOAL_ICONS = { lose_fat: '📉', build_strength: '💪', improve_endurance: '🏃', maintain_weight: '⚖️', better_sleep: '😴', manage_stress: '🧘', eat_healthier: '🥗' }
-                const GOAL_LABELS = { lose_fat: 'Lose fat', build_strength: 'Build strength', improve_endurance: 'Improve endurance', maintain_weight: 'Maintain weight', better_sleep: 'Better sleep', manage_stress: 'Manage stress', eat_healthier: 'Eat healthier' }
-                return (
-                  <div key={goal} className="flex items-center gap-2">
-                    <span className="text-sm">{GOAL_ICONS[goal]}</span>
-                    <span className="text-xs font-semibold text-green-primary">{GOAL_LABELS[goal]}</span>
-                    <span className="text-xs text-stone-400">— {reason}</span>
-                  </div>
-                )
-              })}
-            </div>
-          ) : (
-            <p className="text-xs text-stone-400">Counts as an active session toward your weekly goal</p>
-          )}
+      {/* Goal contribution */}
+      {duration && parseFloat(duration) > 0 && contrib.matched.length > 0 && (
+        <div className="mt-3 flex flex-wrap gap-x-3 gap-y-1.5 px-3 py-2.5 rounded-xl" style={{ background: '#F5F7F3' }}>
+          {contrib.matched.map(({ goal, reason }) => {
+            const GOAL_ICONS = { lose_fat: '📉', build_strength: '💪', improve_endurance: '🏃', maintain_weight: '⚖️', better_sleep: '😴', manage_stress: '🧘', eat_healthier: '🥗' }
+            return (
+              <span key={goal} className="text-xs text-stone-600">
+                {GOAL_ICONS[goal]} <span className="font-medium text-green-primary">{goal.replace(/_/g, ' ')}</span>
+                <span className="text-stone-400"> · {reason}</span>
+              </span>
+            )
+          })}
+          <span className="text-xs text-stone-400 w-full">{contrib.weeklyLabel}</span>
         </div>
       )}
 
-      {/* Notes */}
-      <div className="mt-4">
+      {/* Notes toggle */}
+      {showNotes ? (
         <input
-          className="w-full border border-stone-200 rounded-xl px-4 py-3 text-sm focus:border-activity"
-          placeholder="Optional notes…"
+          className="w-full mt-3 border-0 border-b border-stone-200 px-0 py-2 text-sm bg-transparent focus:outline-none focus:border-green-primary placeholder-stone-300"
+          placeholder="Add a note…"
           value={notes}
           onChange={e => setNotes(e.target.value)}
+          autoFocus
         />
-      </div>
+      ) : (
+        <button onClick={() => setShowNotes(true)} className="mt-3 text-xs text-stone-400 hover:text-stone-500">+ add note</button>
+      )}
 
       <button
         onClick={handleLog}
