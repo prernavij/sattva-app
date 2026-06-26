@@ -274,7 +274,7 @@ function BodyTab() {
   const firstBody = bodyLogs.length ? bodyLogs[0] : null
   const currentWeight = latestBody?.weight_lbs || profile.weight_lbs
   const startWeight = firstBody?.weight_lbs || profile.weight_lbs
-  const goalWeight = profile.goal === 'lose' ? startWeight - 10 : profile.goal === 'build' ? startWeight + 10 : startWeight
+  const goalWeight = profile.target_weight_lbs || startWeight
   const weightChange = currentWeight - startWeight
   const weeksData = bodyLogs.slice(-4).map((b, i) => ({ week: i + 1, weight: b.weight_lbs }))
 
@@ -322,7 +322,7 @@ function BodyTab() {
       <div className="bg-stone-50 rounded-xl p-3 mb-5 flex gap-3">
         <DiyaLogo size={24} className="shrink-0 mt-0.5" />
         <p className="text-xs text-stone-600 leading-relaxed">
-          Consistent protein intake ({profile.goal === 'build' ? '2.0' : '1.6'}g/kg) protects muscle during weight changes.
+          Consistent protein intake ({(Array.isArray(profile.goals) && profile.goals.includes('build_strength')) ? '2.0' : '1.6'}g/kg) protects muscle during weight changes.
           Pair strength training with protein timing for best body composition results.
         </p>
       </div>
@@ -385,14 +385,13 @@ function BodyTab() {
 }
 
 function StatsTab() {
-  const { goals, foodLogs, activityLogs, sleepLogs, waterLogs, todayKcal, todayProtein, todayWater_l, todaySleep_h } = useApp()
+  const { goals, todayKcal, todayProtein, todayWater_l, todaySleep_h, weekHistory } = useApp()
 
-  // Build 7-day data (simplified — using today's values for demo)
   const days = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun']
   const todayIdx = (new Date().getDay() + 6) % 7
-  const kcalData = days.map((d, i) => i === todayIdx ? todayKcal : Math.round(goals.cal_goal * (0.7 + Math.random() * 0.5)))
-  const protData = days.map((d, i) => i === todayIdx ? todayProtein : Math.round(goals.protein_goal * (0.6 + Math.random() * 0.6)))
-  const maxKcal = Math.max(...kcalData, goals.cal_goal)
+  // weekHistory is indexed Mon–Sun; today's real value overrides its slot
+  const kcalData = days.map((_, i) => i === todayIdx ? todayKcal : (weekHistory[i] || 0))
+  const maxKcal = Math.max(...kcalData, goals.cal_goal, 1)
 
   return (
     <div className="flex-1 overflow-y-auto scrollable px-4 py-4">
@@ -423,39 +422,22 @@ function StatsTab() {
         </div>
       </div>
 
-      {/* Protein bars */}
-      <div className="bg-white rounded-xl p-4 shadow-card mb-4">
-        <p className="text-xs font-semibold text-stone-400 uppercase tracking-wide mb-3">7-day protein</p>
-        {protData.map((val, i) => (
-          <div key={i} className="flex items-center gap-2 mb-1.5">
-            <span className="text-[11px] text-stone-400 w-6">{days[i].slice(0,1)}</span>
-            <div className="flex-1 h-4 bg-stone-100 rounded-full overflow-hidden">
-              <div
-                className="h-full rounded-full transition-all"
-                style={{
-                  width: `${Math.min((val / goals.protein_goal) * 100, 100)}%`,
-                  background: i === todayIdx ? '#3D5240' : '#F0C9A0',
-                }}
-              />
-            </div>
-            <span className="text-[11px] text-stone-500 w-8 text-right">{val}g</span>
+      {/* Today's snapshot */}
+      <div className="grid grid-cols-2 gap-3 mb-4">
+        {[
+          { label: 'Protein today', value: `${Math.round(todayProtein)}g`, goal: `${goals.protein_goal}g`, pct: todayProtein / goals.protein_goal },
+          { label: 'Sleep last night', value: `${todaySleep_h.toFixed(1)}h`, goal: `${goals.sleep_goal_h}h`, pct: todaySleep_h / goals.sleep_goal_h },
+          { label: 'Water today', value: `${todayWater_l.toFixed(1)}L`, goal: `${goals.water_goal_l}L`, pct: todayWater_l / goals.water_goal_l },
+        ].map(s => (
+          <div key={s.label} className="bg-white rounded-xl p-4 shadow-card">
+            <p className="text-xs font-semibold text-stone-400 uppercase tracking-wide mb-2">{s.label}</p>
+            <p className="text-2xl font-bold" style={{ color: '#3D5240' }}>{s.value}</p>
+            <p className="text-xs text-stone-400 mb-2">Goal: {s.goal}</p>
+            <ProgressBar value={Math.min(s.pct, 1)} max={1} color="#3D5240" height={4} />
           </div>
         ))}
-      </div>
-
-      {/* Sleep + Water summary */}
-      <div className="grid grid-cols-2 gap-3">
-        <div className="bg-white rounded-xl p-4 shadow-card">
-          <p className="text-xs font-semibold text-stone-400 uppercase tracking-wide mb-2">Sleep avg</p>
-          <p className="text-2xl font-bold" style={{ color: '#3D5240' }}>{todaySleep_h.toFixed(1)}h</p>
-          <p className="text-xs text-stone-400">Goal: {goals.sleep_goal_h}h</p>
-          <ProgressBar value={todaySleep_h} max={goals.sleep_goal_h} color="#3D5240" height={4} className="mt-2" />
-        </div>
-        <div className="bg-white rounded-xl p-4 shadow-card">
-          <p className="text-xs font-semibold text-stone-400 uppercase tracking-wide mb-2">Water avg</p>
-          <p className="text-2xl font-bold text-water">{todayWater_l.toFixed(1)}L</p>
-          <p className="text-xs text-stone-400">Goal: {goals.water_goal_l}L</p>
-          <ProgressBar value={todayWater_l} max={goals.water_goal_l} color="#3D5240" height={4} className="mt-2" />
+        <div className="bg-white rounded-xl p-4 shadow-card flex flex-col justify-center items-center text-center">
+          <p className="text-xs text-stone-300 leading-relaxed">More history as you keep logging</p>
         </div>
       </div>
       <div className="h-6" />
