@@ -293,139 +293,17 @@ function FoodLogger({ onClose, onLog }) {
 }
 
 function ConsultTab() {
-  const { goals, todayKcal, todayProtein } = useApp()
-  const [messages, setMessages] = useState([
-    { role: 'assistant', text: `Hi! I'm your Sattva food consultant. Tell me about what you're considering eating — restaurant menus, options you're weighing — and I'll help you choose based on your remaining ${Math.max(0, goals.cal_goal - todayKcal)} kcal and ${Math.max(0, goals.protein_goal - todayProtein).toFixed(0)}g protein for today.` }
-  ])
-  const [input, setInput] = useState('')
-  const [loading, setLoading] = useState(false)
-  const bottomRef = useRef(null)
-
-  const kcalLeft = Math.max(0, goals.cal_goal - todayKcal)
-  const protLeft = Math.max(0, goals.protein_goal - todayProtein)
-
-  const send = async () => {
-    if (!input.trim() || loading) return
-    const userMsg = input.trim()
-    setInput('')
-    setMessages(m => [...m, { role: 'user', text: userMsg }])
-    setLoading(true)
-
-    try {
-      const apiKey = import.meta.env.VITE_GEMINI_API_KEY
-      const systemPrompt = `You are Sattva, a practical, non-preachy food consultant. The user has ${kcalLeft} kcal and ${protLeft.toFixed(0)}g protein remaining for today. Give concrete, actionable advice in 2-4 sentences. If they want an indulgent option, tell them how to make it work. Reference specific numbers when helpful. Never shame food choices. Keep tone warm and friendly, like a knowledgeable friend.`
-
-      const history = messages.slice(1).map(m => ({
-        role: m.role === 'assistant' ? 'model' : 'user',
-        parts: [{ text: m.text }]
-      }))
-
-      const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key=${apiKey}`,
-        {
-          method: 'POST',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({
-            system_instruction: { parts: [{ text: systemPrompt }] },
-            contents: [...history, { role: 'user', parts: [{ text: userMsg }] }],
-            generationConfig: { maxOutputTokens: 256, temperature: 0.7 }
-          })
-        }
-      )
-      const data = await response.json()
-      if (!response.ok) {
-        const errMsg = data.error?.message || `API error ${response.status}`
-        setMessages(m => [...m, { role: 'assistant', text: `Error: ${errMsg}` }])
-      } else {
-        const reply = data.candidates?.[0]?.content?.parts?.[0]?.text || 'No response received.'
-        setMessages(m => [...m, { role: 'assistant', text: reply }])
-      }
-    } catch (e) {
-      setMessages(m => [...m, { role: 'assistant', text: `Connection error: ${e.message}` }])
-    }
-    setLoading(false)
-    setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 100)
-  }
-
   return (
-    <div className="flex flex-col flex-1 overflow-hidden">
-      {/* Remaining stats */}
-      <div className="px-4 py-3 bg-green-light border-b border-green-mid/30 flex gap-4">
-        <div className="text-center">
-          <p className="text-base font-bold text-green-primary">{kcalLeft}</p>
-          <p className="text-xs text-stone-500">kcal left</p>
-        </div>
-        <div className="text-center">
-          <p className="text-base font-bold text-activity">{protLeft.toFixed(0)}g</p>
-          <p className="text-xs text-stone-500">protein left</p>
-        </div>
+    <div className="flex flex-col flex-1 items-center justify-center px-8 text-center gap-4">
+      <div className="w-16 h-16 rounded-full bg-green-light flex items-center justify-center text-3xl">
+        ✨
       </div>
-
-      {/* Messages */}
-      <div className="flex-1 overflow-y-auto scrollable px-4 py-4 flex flex-col gap-3">
-        {messages.map((m, i) => (
-          <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-            <div
-              className="max-w-[85%] rounded-2xl px-4 py-3 text-sm leading-relaxed"
-              style={{
-                background: m.role === 'user' ? '#3D5240' : '#E4E7DF',
-                color: m.role === 'user' ? '#fff' : '#374151',
-                borderBottomRightRadius: m.role === 'user' ? 4 : 16,
-                borderBottomLeftRadius: m.role === 'user' ? 16 : 4,
-              }}
-            >
-              {m.text}
-            </div>
-          </div>
-        ))}
-        {loading && (
-          <div className="flex justify-start">
-            <div className="bg-stone-100 rounded-2xl px-4 py-3">
-              <div className="flex gap-1">
-                {[0,1,2].map(i => (
-                  <div key={i} className="w-2 h-2 bg-stone-400 rounded-full animate-bounce"
-                    style={{ animationDelay: `${i*0.15}s` }} />
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
-        <div ref={bottomRef} />
-      </div>
-
-      {/* Input */}
-      <div className="px-4 py-3 border-t border-stone-100 bg-white flex gap-2">
-        <input
-          className="flex-1 border border-stone-200 rounded-xl px-4 py-2.5 text-sm focus:border-green-primary"
-          placeholder="Describe the menu or options…"
-          value={input}
-          onChange={e => setInput(e.target.value)}
-          onKeyDown={e => e.key === 'Enter' && send()}
-        />
-        <button
-          onClick={send}
-          disabled={!input.trim() || loading}
-          className="px-4 py-2.5 bg-green-primary text-white rounded-xl text-sm font-medium disabled:opacity-50"
-        >
-          Send
-        </button>
-      </div>
+      <p className="font-serif text-xl font-bold text-green-primary">Coming Soon</p>
+      <p className="text-sm text-stone-500 leading-relaxed">
+        AI-powered food consultation — ask about menus, swap ideas, and get advice tailored to your daily goals.
+      </p>
     </div>
   )
-}
-
-function getDemoResponse(msg, kcalLeft, protLeft) {
-  const lower = msg.toLowerCase()
-  if (lower.includes('biryani') || lower.includes('rice')) {
-    return `Chicken biryani runs about 480 kcal and 22g protein per plate — that fits well in your ${kcalLeft} kcal budget. Go for it, just skip the raita if you're watching dairy, or keep it for the extra protein.`
-  }
-  if (lower.includes('burger') || lower.includes('pizza')) {
-    return `A burger is around 450 kcal — you have ${kcalLeft} kcal left, so it works if you skip the fries or share them. Adds about 20g protein which helps hit your ${protLeft.toFixed(0)}g remaining. Totally doable.`
-  }
-  if (lower.includes('salad')) {
-    return `A protein salad with chicken or paneer is a great call — around 200-280 kcal and 20-25g protein. With ${kcalLeft} kcal left, you could even pair it with a roti or bread roll and still be well within target.`
-  }
-  return `With ${kcalLeft} kcal and ${protLeft.toFixed(0)}g protein remaining, I'd suggest something protein-forward — grilled chicken, paneer, eggs, or dal. These options help you hit your protein goal without blowing the calorie budget. What specific options are you choosing between?`
 }
 
 export default function Food() {
