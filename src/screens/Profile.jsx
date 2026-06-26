@@ -38,6 +38,7 @@ export default function Profile() {
   const [editing, setEditing] = useState(false)
   const [editForm, setEditForm] = useState({ ...profile, target_weight_lbs: profile.target_weight_lbs ?? '' })
   const [activeSection, setActiveSection] = useState('profile') // 'profile' | 'notif'
+  const [confirmReset, setConfirmReset] = useState(false)
 
   const set = (k, v) => setEditForm(f => ({ ...f, [k]: v }))
   const setNotif = (k, v) => setNotifSettings(s => ({ ...s, [k]: v }))
@@ -438,21 +439,39 @@ export default function Profile() {
             Sign out
           </button>
           <button
-            onClick={async () => {
-              // Delete profile from Supabase so onboarding runs again on next sign-in
-              const { data: { user } } = await supabase.auth.getUser()
-              if (user) {
-                await supabase.from('profiles').delete().eq('user_id', user.id)
-              }
-              await signOut()
-              localStorage.clear()
-              sessionStorage.clear()
-              window.location.reload()
-            }}
+            onClick={() => setConfirmReset(true)}
             className="w-full py-2.5 rounded-xl text-xs font-medium text-stone-300 border border-dashed border-stone-200"
           >
             Reset app (re-run onboarding)
           </button>
+
+          {confirmReset && (
+            <div className="mt-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3">
+              <p className="text-sm font-medium text-red-700 mb-1">Reset everything?</p>
+              <p className="text-xs text-red-400 mb-3">All your logs, goals, and progress will be cleared. This can't be undone.</p>
+              <div className="flex gap-2">
+                <button
+                  onClick={async () => {
+                    const { data: { user } } = await supabase.auth.getUser()
+                    if (user) await supabase.from('profiles').delete().eq('user_id', user.id)
+                    await signOut()
+                    localStorage.clear()
+                    sessionStorage.clear()
+                    window.location.reload()
+                  }}
+                  className="flex-1 py-2 rounded-lg text-xs font-semibold bg-red-500 text-white"
+                >
+                  Yes, reset
+                </button>
+                <button
+                  onClick={() => setConfirmReset(false)}
+                  className="flex-1 py-2 rounded-lg text-xs font-semibold bg-white border border-stone-200 text-stone-600"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>
