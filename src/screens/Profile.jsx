@@ -147,7 +147,7 @@ export default function Profile() {
                   <h2 className="text-sm font-semibold text-stone-700">Weight goal</h2>
                   <span className="text-xs font-semibold px-2 py-0.5 rounded-pill"
                     style={{ background: '#3D524018', color: '#3D5240' }}>
-                    {GOAL_LABELS[profile.goal] || profile.goal}
+                    {(Array.isArray(profile.goals) ? profile.goals : [profile.goal]).map(g => g.replace('_', ' ')).join(' · ')}
                   </span>
                 </div>
                 {(() => {
