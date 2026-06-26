@@ -324,12 +324,50 @@ export default function Profile() {
                     enabled={notifSettings.bedtime_on && notifSettings.master_on}
                   />
                 </div>
-                <div className="flex justify-between items-center">
-                  <div>
-                    <p className="text-sm font-medium text-stone-700">🏃 Activity nudge</p>
-                    <p className="text-xs text-stone-400">6pm if no activity logged</p>
+                <div className="flex flex-col gap-2">
+                  <div className="flex justify-between items-center">
+                    <div>
+                      <p className="text-sm font-medium text-stone-700">🏃 Activity nudge</p>
+                      <p className="text-xs text-stone-400">Remind if no activity logged yet</p>
+                    </div>
+                    <Toggle value={notifSettings.activity_nudge_on} onChange={v => setNotif('activity_nudge_on', v)} />
                   </div>
-                  <Toggle value={notifSettings.activity_nudge_on} onChange={v => setNotif('activity_nudge_on', v)} />
+                  {notifSettings.activity_nudge_on && notifSettings.master_on && (
+                    <div className="flex flex-col gap-1.5 pl-1">
+                      {(notifSettings.activity_nudge_times || ['18:00']).map((t, i) => (
+                        <div key={i} className="flex items-center gap-2">
+                          <input
+                            type="time"
+                            value={t}
+                            onChange={e => {
+                              const times = [...(notifSettings.activity_nudge_times || ['18:00'])]
+                              times[i] = e.target.value
+                              setNotif('activity_nudge_times', times)
+                            }}
+                            className="border border-stone-200 rounded-lg px-2 py-1 text-sm text-stone-700 bg-white"
+                          />
+                          {(notifSettings.activity_nudge_times || ['18:00']).length > 1 && (
+                            <button
+                              onClick={() => {
+                                const times = (notifSettings.activity_nudge_times || ['18:00']).filter((_, j) => j !== i)
+                                setNotif('activity_nudge_times', times)
+                              }}
+                              className="text-stone-300 hover:text-red-400 text-lg leading-none"
+                            >×</button>
+                          )}
+                        </div>
+                      ))}
+                      {(notifSettings.activity_nudge_times || ['18:00']).length < 4 && (
+                        <button
+                          onClick={() => {
+                            const times = [...(notifSettings.activity_nudge_times || ['18:00']), '20:00']
+                            setNotif('activity_nudge_times', times)
+                          }}
+                          className="text-xs text-green-primary font-medium self-start mt-0.5"
+                        >+ Add time</button>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
