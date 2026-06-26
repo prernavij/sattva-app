@@ -22,11 +22,12 @@ const ACTIVITIES = [
     goalLinks: { lose_fat: 'Fun, sustained movement', manage_stress: 'Lifts mood and energy', improve_endurance: 'Sustained cardio' } },
 ]
 
-function getContribution(actId, durationMin, userGoals) {
+function getContribution(actId, durationMin, userGoals, goalNotes) {
   const act = ACTIVITIES.find(a => a.id === actId)
   const type = act?.type || 'general'
   const goalLinks = act?.goalLinks || {}
   const matched = (userGoals || []).filter(g => goalLinks[g]).map(g => ({ goal: g, reason: goalLinks[g] }))
+  if (goalNotes?.trim()) matched.push({ goal: '__custom__', reason: goalNotes.trim() })
   let weeklyLabel
   if (type === 'strength') weeklyLabel = '+1 strength session'
   else if (type === 'cardio') weeklyLabel = `+${durationMin} min cardio`
@@ -112,7 +113,7 @@ function LogTab() {
   const actIdForContrib = isCustom
     ? (ACTIVITIES.find(a => a.label.toLowerCase() === customActivity.trim().toLowerCase())?.id || null)
     : activity
-  const contrib = getContribution(actIdForContrib, parseFloat(duration) || 0, userGoals)
+  const contrib = getContribution(actIdForContrib, parseFloat(duration) || 0, userGoals, profile.goal_notes)
 
   const handleLog = () => {
     if (!duration || parseFloat(duration) <= 0) return
@@ -194,11 +195,12 @@ function LogTab() {
       {duration && parseFloat(duration) > 0 && contrib.matched.length > 0 && (
         <div className="mt-3 flex flex-wrap gap-x-3 gap-y-1.5 px-3 py-2.5 rounded-xl" style={{ background: '#F5F7F3' }}>
           {contrib.matched.map(({ goal, reason }) => {
-            const GOAL_ICONS = { lose_fat: '📉', build_strength: '💪', improve_endurance: '🏃', maintain_weight: '⚖️', better_sleep: '😴', manage_stress: '🧘', eat_healthier: '🥗' }
+            const GOAL_ICONS = { lose_fat: '📉', build_strength: '💪', improve_endurance: '🏃', maintain_weight: '⚖️', better_sleep: '😴', manage_stress: '🧘', eat_healthier: '🥗', __custom__: '✏️' }
+            const GOAL_LABELS = { lose_fat: 'Lose fat', build_strength: 'Build strength', improve_endurance: 'Improve endurance', maintain_weight: 'Maintain weight', better_sleep: 'Better sleep', manage_stress: 'Manage stress', eat_healthier: 'Eat healthier', __custom__: reason }
             return (
               <span key={goal} className="text-xs text-stone-600">
-                {GOAL_ICONS[goal]} <span className="font-medium text-green-primary">{goal.replace(/_/g, ' ')}</span>
-                <span className="text-stone-400"> · {reason}</span>
+                {GOAL_ICONS[goal]} <span className="font-medium" style={{ color: goal === '__custom__' ? '#7A6A50' : '#3D5240' }}>{GOAL_LABELS[goal]}</span>
+                {goal !== '__custom__' && <span className="text-stone-400"> · {reason}</span>}
               </span>
             )
           })}
@@ -238,9 +240,9 @@ function LogTab() {
           <div className="bg-white rounded-xl shadow-card overflow-hidden">
             {activityLogs.map(log => {
               const act = ACTIVITIES.find(a => a.id === log.activity_type || a.label.toLowerCase() === log.activity_type?.toLowerCase())
-              const logContrib = getContribution(act?.id || null, log.duration_min, userGoals)
+              const logContrib = getContribution(act?.id || null, log.duration_min, userGoals, profile.goal_notes)
               const topGoal = logContrib.matched[0]
-              const GOAL_ICONS = { lose_fat: '📉', build_strength: '💪', improve_endurance: '🏃', maintain_weight: '⚖️', better_sleep: '😴', manage_stress: '🧘', eat_healthier: '🥗' }
+              const GOAL_ICONS = { lose_fat: '📉', build_strength: '💪', improve_endurance: '🏃', maintain_weight: '⚖️', better_sleep: '😴', manage_stress: '🧘', eat_healthier: '🥗', __custom__: '✏️' }
               return (
                 <div key={log.id} className="flex items-center px-4 py-3 border-b border-stone-50 last:border-0">
                   <span className="text-xl mr-3">{act?.icon || '🏃'}</span>
@@ -248,7 +250,7 @@ function LogTab() {
                     <p className="text-sm font-medium text-stone-800">{act?.label || log.activity_type}</p>
                     <p className="text-xs text-stone-400">
                       {log.duration_min} min · {logContrib.weeklyLabel}
-                      {topGoal ? <span className="ml-1">{GOAL_ICONS[topGoal.goal]} {topGoal.reason}</span> : ''}
+                      {topGoal ? <span className="ml-1">{GOAL_ICONS[topGoal.goal]} {topGoal.goal === '__custom__' ? topGoal.reason : topGoal.reason}</span> : ''}
                     </p>
                   </div>
                   <button onClick={() => removeActivityLog(log.id)} className="text-stone-300 hover:text-red-400 text-lg leading-none ml-2">×</button>

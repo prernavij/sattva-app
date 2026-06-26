@@ -243,10 +243,10 @@ export default function Profile() {
                     </div>
                   </div>
                   <div>
-                    <label className="text-xs text-stone-500 block mb-1">Anything else?</label>
+                    <label className="text-xs text-stone-500 block mb-1">Custom goal</label>
                     <input
                       className="w-full border border-stone-200 rounded-xl px-3 py-2.5 text-sm bg-white"
-                      placeholder="Custom goal notes…"
+                      placeholder="e.g. train for a 5K, improve flexibility…"
                       value={editForm.goal_notes || ''}
                       onChange={e => set('goal_notes', e.target.value)}
                     />
@@ -276,19 +276,16 @@ export default function Profile() {
               <h3 className="text-sm font-semibold text-stone-700 mb-3">About</h3>
               <div className="flex justify-between py-2 border-b border-stone-50">
                 <span className="text-sm text-stone-500">Goals</span>
-                <div className="flex flex-wrap gap-1 justify-end max-w-[60%]">
+                <div className="flex flex-wrap gap-1 justify-end max-w-[65%]">
                   {(Array.isArray(profile.goals) ? profile.goals : ['maintain_weight']).map(gid => {
                     const opt = GOAL_OPTIONS.find(o => o.id === gid)
                     return opt ? <span key={gid} className="text-xs px-2 py-0.5 rounded-full font-medium" style={{ background: '#E2EAE0', color: '#3D5240' }}>{opt.icon} {opt.label}</span> : null
                   })}
+                  {profile.goal_notes?.trim() && (
+                    <span className="text-xs px-2 py-0.5 rounded-full font-medium" style={{ background: '#EDE8E0', color: '#7A6A50' }}>✏️ {profile.goal_notes}</span>
+                  )}
                 </div>
               </div>
-              {profile.goal_notes?.trim() && (
-                <div className="flex justify-between py-2 border-b border-stone-50">
-                  <span className="text-sm text-stone-500">Notes</span>
-                  <span className="text-sm text-stone-600 max-w-[60%] text-right">{profile.goal_notes}</span>
-                </div>
-              )}
               {[
                 { label: 'Activity', value: ACTIVITY_LABELS[profile.activity_level] },
                 { label: 'Sex', value: profile.sex === 'female' ? 'Female' : 'Male' },

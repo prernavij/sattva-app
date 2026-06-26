@@ -258,7 +258,7 @@ export default function Onboarding() {
 
             <div>
               <label className="text-sm font-medium text-stone-600 block mb-1.5">
-                Anything else? <span className="text-stone-400 font-normal">— optional</span>
+                Custom goal <span className="text-stone-400 font-normal">— optional</span>
               </label>
               <input
                 className="w-full border border-stone-200 rounded-xl px-4 py-3 text-sm bg-white focus:border-green-primary transition-colors"
