@@ -301,25 +301,40 @@ function FoodLogger({ onClose, onLog }) {
           </div>
         )}
 
-        {/* Result */}
+        {/* Result — editable */}
         {mode === 'found' && result && (
           <div className="mb-4 rounded-xl p-4" style={{ background: '#F5F7F3', border: '1px solid #DDE4DA' }}>
-            <div className="flex justify-between items-start mb-2">
-              <p className="font-semibold text-stone-800 flex-1 pr-2 capitalize">{result.name}</p>
+            <div className="flex justify-between items-start mb-3">
+              <input
+                className="font-semibold text-stone-800 flex-1 pr-2 bg-transparent border-0 border-b border-stone-200 focus:outline-none focus:border-green-primary text-sm capitalize"
+                value={result.name}
+                onChange={e => setResult(r => ({ ...r, name: e.target.value }))}
+              />
               {result.source === 'ai' && (
-                <span className="text-[10px] font-medium text-green-primary bg-green-light px-2 py-0.5 rounded-pill shrink-0">AI estimate</span>
+                <span className="text-[10px] font-medium text-green-primary bg-green-light px-2 py-0.5 rounded-pill shrink-0 ml-2">AI estimate</span>
               )}
             </div>
             <div className="grid grid-cols-4 gap-2 text-center">
               {[
-                { label: 'Calories', value: result.kcal, unit: 'kcal' },
-                { label: 'Protein', value: result.protein, unit: 'g' },
-                { label: 'Carbs', value: result.carbs, unit: 'g' },
-                { label: 'Fat', value: result.fat, unit: 'g' },
-              ].map(m => (
-                <div key={m.label} className="bg-white rounded-lg py-2">
-                  <p className="text-sm font-bold text-stone-800">{m.value}<span className="text-xs font-normal text-stone-400">{m.unit}</span></p>
-                  <p className="text-[10px] text-stone-400">{m.label}</p>
+                { key: 'kcal',    label: 'Calories', unit: 'kcal', step: 1 },
+                { key: 'protein', label: 'Protein',  unit: 'g',    step: 0.5 },
+                { key: 'carbs',   label: 'Carbs',    unit: 'g',    step: 1 },
+                { key: 'fat',     label: 'Fat',      unit: 'g',    step: 0.5 },
+              ].map(({ key, label, unit, step }) => (
+                <div key={key} className="bg-white rounded-lg py-2 px-1">
+                  <div className="flex items-baseline justify-center gap-0.5">
+                    <input
+                      type="number"
+                      inputMode="decimal"
+                      step={step}
+                      min="0"
+                      className="w-full text-sm font-bold text-stone-800 text-center bg-transparent border-0 focus:outline-none focus:border-b focus:border-green-primary"
+                      value={result[key] ?? ''}
+                      onChange={e => setResult(r => ({ ...r, [key]: e.target.value === '' ? 0 : parseFloat(e.target.value) || 0 }))}
+                    />
+                    <span className="text-[10px] text-stone-400 shrink-0">{unit}</span>
+                  </div>
+                  <p className="text-[10px] text-stone-400 mt-0.5">{label}</p>
                 </div>
               ))}
             </div>
