@@ -47,9 +47,9 @@ export function calcGoals(profile) {
   const betterSleep   = has('better_sleep')
 
   let calOffset = 0
-  if (loseFat && buildStrength)      calOffset = -100
-  else if (loseFat && endurance)     calOffset = -150
-  else if (loseFat)                  calOffset = -300
+  if (loseFat && buildStrength)      calOffset = -250
+  else if (loseFat && endurance)     calOffset = -300
+  else if (loseFat)                  calOffset = -500
   else if (buildStrength && endurance) calOffset = 100
   else if (buildStrength)            calOffset = 200
 
