@@ -133,6 +133,7 @@ export function AppProvider({ children }) {
   const [insight, setInsight] = useState(null)
   const [lastInsightTone, setLastInsightTone] = useState(null)
   const [streak, setStreak] = useState(() => loadLocal('sattva_streak', 1))
+  const [logStreak, setLogStreak] = useState(() => loadLocal('sattva_log_streak', 0))
   const [banner, setBanner] = useState(null)
 
   // Check for existing session on mount
@@ -240,6 +241,21 @@ export function AppProvider({ children }) {
   useEffect(() => { saveLocal('sattva_body', bodyLogs) }, [bodyLogs])
   useEffect(() => { saveLocal('sattva_notif', notifSettings) }, [notifSettings])
   useEffect(() => { saveLocal('sattva_streak', streak) }, [streak])
+  useEffect(() => { saveLocal('sattva_log_streak', logStreak) }, [logStreak])
+
+  // Bump log streak when first food is logged today
+  useEffect(() => {
+    if (foodLogs.length === 1) {
+      const lastLogDay = loadLocal('sattva_log_streak_day', '')
+      const today = TODAY()
+      if (lastLogDay !== today) {
+        const yesterday = new Date(); yesterday.setDate(yesterday.getDate() - 1)
+        const yStr = yesterday.toISOString().slice(0, 10)
+        setLogStreak(s => lastLogDay === yStr ? s + 1 : 1)
+        saveLocal('sattva_log_streak_day', today)
+      }
+    }
+  }, [foodLogs.length])
 
   // Computed totals
   const todayKcal = foodLogs.reduce((s, f) => s + (f.kcal || 0), 0)
@@ -425,7 +441,7 @@ export function AppProvider({ children }) {
     bodyLogs, addBodyLog,
     weekHistory,
     notifSettings, setNotifSettings,
-    streak, setStreak,
+    streak, setStreak, logStreak,
     insight, setInsight,
     lastInsightTone, setLastInsightTone,
     banner, showBanner,

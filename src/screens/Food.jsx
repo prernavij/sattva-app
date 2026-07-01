@@ -27,6 +27,19 @@ function getDailyStatus(value, goal, type = 'default') {
   return                                     { status: 'ok',           color: '#3D5240', bg: null }
 }
 
+const CAL_ZONES = [
+  { max: 0.25, label: 'Light day',     color: '#8A9688', bar: '#BDC9B6' },
+  { max: 0.60, label: 'On track',      color: '#3D5240', bar: '#3D5240' },
+  { max: 0.85, label: 'Nourished',     color: '#3D5240', bar: '#3D5240' },
+  { max: 1.00, label: 'Getting full',  color: '#D97706', bar: '#D97706' },
+  { max: 1.10, label: 'Right at goal', color: '#D97706', bar: '#D97706' },
+  { max: Infinity, label: 'Over today',color: '#DC2626', bar: '#DC2626' },
+]
+function getZone(kcal, goal) {
+  const pct = goal > 0 ? kcal / goal : 0
+  return CAL_ZONES.find(z => pct <= z.max) || CAL_ZONES[CAL_ZONES.length - 1]
+}
+
 function getAlerts(kcal, protein, calGoal, proteinGoal) {
   const hour = new Date().getHours()
   const alerts = []
@@ -35,72 +48,61 @@ function getAlerts(kcal, protein, calGoal, proteinGoal) {
   const protLeft = Math.round(proteinGoal - protein)
 
   if (calPct > 1.1) {
-    alerts.push({ key: 'cal_over', icon: '🔴', color: '#DC2626', bg: '#FEF2F2', msg: `${kcal - calGoal} kcal over goal — skip that dessert` })
+    alerts.push({ key: 'cal_over', color: '#B45309', bg: '#FFF7ED', msg: `You've had a full day of eating 🌿 keep it light from here` })
   } else if (calPct > 1.0) {
-    alerts.push({ key: 'cal_limit', icon: '🟡', color: '#D97706', bg: '#FFF7ED', msg: 'Right at your calorie limit' })
+    alerts.push({ key: 'cal_limit', color: '#B45309', bg: '#FFF7ED', msg: 'Right at your goal — nice balance today' })
   } else if (calPct > 0.85 && hour < 15) {
-    alerts.push({ key: 'cal_early', icon: '⚠️', color: '#D97706', bg: '#FFF7ED', msg: `${Math.round(calGoal * 0.15)} kcal left before 3pm` })
+    alerts.push({ key: 'cal_early', color: '#78716C', bg: '#F5F5F4', msg: 'Going at a good pace — save room for dinner' })
   }
 
   if (hour >= 19 && protPct < 0.4) {
-    alerts.push({ key: 'prot_critical', icon: '💪', color: '#DC2626', bg: '#FEF2F2', msg: `${protLeft}g protein left — try eggs or cottage cheese` })
+    alerts.push({ key: 'prot_critical', color: '#78716C', bg: '#F5F5F4', msg: `Protein's a bit low today — eggs or curd before bed works great` })
   } else if (hour >= 17 && protPct < 0.6) {
-    alerts.push({ key: 'prot_low', icon: '💪', color: '#D97706', bg: '#FFF7ED', msg: `${protLeft}g protein left — add a protein-rich snack` })
+    alerts.push({ key: 'prot_low', color: '#78716C', bg: '#F5F5F4', msg: `A little more protein would round out your day` })
   }
 
   return alerts
 }
 
 function MacroStrip({ kcal, protein, calGoal, proteinGoal }) {
-  const kcalOver = kcal > calGoal
-  const kcalLeft = calGoal - kcal // can be negative
-  const protLeft = Math.max(0, proteinGoal - protein)
-  const calSt = getDailyStatus(kcal, calGoal, 'calories')
-  const protSt = getDailyStatus(protein, proteinGoal, 'protein')
-  const alerts = getAlerts(kcal, protein, calGoal, proteinGoal)
-
-  // Progress bar color
-  const barColor = calSt.status === 'over' || calSt.status === 'at_limit' ? calSt.color : '#3D5240'
+  const zone    = getZone(kcal, calGoal)
+  const protSt  = getDailyStatus(protein, proteinGoal, 'protein')
+  const alerts  = getAlerts(kcal, protein, calGoal, proteinGoal)
+  const calPct  = calGoal > 0 ? Math.min((kcal / calGoal) * 100, 100) : 0
+  const protPct = proteinGoal > 0 ? Math.min((protein / proteinGoal) * 100, 100) : 0
 
   return (
-    <div className="bg-white border-b border-stone-100">
-      {/* Alert banner */}
+    <div className="bg-white border-b border-stone-100 px-4 pt-3 pb-3">
+      {/* Zone label row */}
+      <div className="flex justify-between items-center mb-2">
+        <span className="text-sm font-semibold" style={{ color: zone.color }}>{zone.label}</span>
+        <span className="text-xs" style={{ color: '#8A9688' }}>{kcal} / {calGoal} kcal</span>
+      </div>
+      {/* Calorie bar */}
+      <div className="h-1.5 rounded-full overflow-hidden mb-3" style={{ background: '#E4E7DF' }}>
+        <div className="h-full rounded-full transition-all" style={{ width: `${calPct}%`, background: zone.bar }} />
+      </div>
+      {/* Protein row */}
+      <div className="flex justify-between items-center mb-1">
+        <span className="text-xs" style={{ color: protSt.color }}>Protein</span>
+        <span className="text-xs font-medium" style={{ color: protSt.color }}>
+          {Math.round(protein)}g <span style={{ color: '#8A9688', fontWeight: 400 }}>/ {proteinGoal}g</span>
+        </span>
+      </div>
+      <div className="h-1 rounded-full overflow-hidden mb-2" style={{ background: '#E4E7DF' }}>
+        <div className="h-full rounded-full transition-all" style={{ width: `${protPct}%`, background: protSt.color }} />
+      </div>
+      {/* Gentle nudges */}
       {alerts.length > 0 && (
-        <div className="flex gap-2 px-4 pt-2.5 pb-0 overflow-x-auto scrollable">
+        <div className="flex gap-2 overflow-x-auto scrollable mt-1">
           {alerts.map(a => (
-            <div key={a.key} className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium"
+            <div key={a.key} className="shrink-0 px-3 py-1.5 rounded-full text-xs font-medium"
               style={{ background: a.bg, color: a.color }}>
-              {a.icon} {a.msg}
+              {a.msg}
             </div>
           ))}
         </div>
       )}
-      <div className="grid grid-cols-4 gap-0 text-center px-4 pt-3 pb-1">
-        {[
-          { label: 'Eaten', value: kcal, unit: 'kcal', st: calSt },
-          { label: 'Protein', value: `${Math.round(protein)}g`, unit: '', st: protSt },
-          { label: kcalOver ? 'Over by' : 'Remaining', value: Math.abs(kcalLeft), unit: 'kcal', st: kcalOver ? { color: '#DC2626' } : { color: '#3D5240' } },
-          { label: 'Prot left', value: `${Math.round(protLeft)}g`, unit: '', st: protSt.status === 'behind_late' || protSt.status === 'critical_low' ? protSt : { color: '#3D5240' } },
-        ].map((m, i) => (
-          <div key={i} className="flex flex-col items-center border-r border-stone-100 last:border-0 px-1">
-            <span className="text-base font-bold" style={{ color: m.st.color }}>{m.value}</span>
-            {m.unit && <span className="text-[10px] text-stone-400">{m.unit}</span>}
-            <span className="text-[10px] text-stone-400 mt-0.5">{m.label}</span>
-          </div>
-        ))}
-      </div>
-      <div className="px-4 pb-3">
-        <div className="h-1.5 rounded-full overflow-hidden mt-1" style={{ background: '#E4E7DF' }}>
-          <div className="h-full rounded-full transition-all"
-            style={{ width: `${Math.min((kcal / calGoal) * 100, 100)}%`, background: barColor }} />
-        </div>
-        {kcalOver && (
-          <div className="h-1 rounded-full mt-0.5 overflow-hidden" style={{ background: '#FEE2E2' }}>
-            <div className="h-full rounded-full bg-red-500 transition-all"
-              style={{ width: `${Math.min(((kcal - calGoal) / calGoal) * 100 * 5, 100)}%` }} />
-          </div>
-        )}
-      </div>
     </div>
   )
 }

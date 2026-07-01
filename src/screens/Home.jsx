@@ -87,11 +87,25 @@ function MiniBarChart({ data, goal }) {
   )
 }
 
+const CAL_ZONES = [
+  { max: 0.25, label: 'Light day',    color: '#8A9688', bar: '#BDC9B6' },
+  { max: 0.60, label: 'On track',     color: '#3D5240', bar: '#3D5240' },
+  { max: 0.85, label: 'Nourished',    color: '#3D5240', bar: '#3D5240' },
+  { max: 1.00, label: 'Getting full', color: '#D97706', bar: '#D97706' },
+  { max: 1.10, label: 'Right at goal',color: '#D97706', bar: '#D97706' },
+  { max: Infinity, label: 'Over today', color: '#DC2626', bar: '#DC2626' },
+]
+
+function getZone(kcal, goal) {
+  const pct = goal > 0 ? kcal / goal : 0
+  return CAL_ZONES.find(z => pct <= z.max) || CAL_ZONES[CAL_ZONES.length - 1]
+}
+
 export default function Home({ onNavigate }) {
   const {
     profile, goals,
     todayKcal, todayProtein, todayWater_l, todaySleep_h, todayActivity_min,
-    activityLogs, bodyLogs, weekHistory, streak,
+    activityLogs, bodyLogs, weekHistory, streak, logStreak,
     insight, setInsight, lastInsightTone, setLastInsightTone,
   } = useApp()
 
@@ -121,28 +135,25 @@ export default function Home({ onNavigate }) {
   const avgKcal = Math.round(weekData.reduce((s,d)=>s+d.val,0) / weekData.filter(d=>d.val>0).length || 0)
   const goalsHit = weekData.filter(d => d.val >= goals.cal_goal * 0.85 && d.val <= goals.cal_goal * 1.15).length
 
-  const calPct = goals.cal_goal > 0 ? Math.min(Math.round((todayKcal / goals.cal_goal) * 100), 100) : 0
-  const calSt   = getDailyStatus(todayKcal, goals.cal_goal, 'calories')
+  const calPct  = goals.cal_goal > 0 ? Math.min((todayKcal / goals.cal_goal) * 100, 100) : 0
+  const zone    = getZone(todayKcal, goals.cal_goal)
   const protSt  = getDailyStatus(todayProtein, goals.protein_goal, 'protein')
   const waterSt = getDailyStatus(todayWater_l, goals.water_goal_l, 'water')
   const sleepSt = getDailyStatus(todaySleep_h, goals.sleep_goal_h, 'sleep')
 
-  // Inline callouts for over-goal / behind-late situations
   const hour = new Date().getHours()
   const homeAlerts = []
-  if (calSt.status === 'over')
-    homeAlerts.push({ key: 'cal', color: '#DC2626', bg: '#FEF2F2', msg: `${todayKcal - goals.cal_goal} kcal over — consider a lighter dinner` })
-  else if (calSt.status === 'at_limit')
-    homeAlerts.push({ key: 'cal', color: '#D97706', bg: '#FFF7ED', msg: 'Right at your calorie limit' })
+  if (zone.label === 'Over today')
+    homeAlerts.push({ key: 'cal', color: '#B45309', bg: '#FFF7ED', msg: `You've had a full day of eating 🌿 keep dinner light` })
   if (hour >= 19 && protSt.status === 'critical_low')
-    homeAlerts.push({ key: 'prot', color: '#DC2626', bg: '#FEF2F2', msg: `${Math.round(goals.protein_goal - todayProtein)}g protein left — try eggs or cottage cheese` })
+    homeAlerts.push({ key: 'prot', color: '#B45309', bg: '#FFF7ED', msg: `Protein's low for the day — eggs or curd before bed works great` })
   else if (hour >= 17 && protSt.status === 'behind_late')
-    homeAlerts.push({ key: 'prot', color: '#D97706', bg: '#FFF7ED', msg: `${Math.round(goals.protein_goal - todayProtein)}g protein left — add a protein snack` })
+    homeAlerts.push({ key: 'prot', color: '#78716C', bg: '#F5F5F4', msg: `A little more protein would round out your day nicely` })
 
   return (
     <div className="flex flex-col flex-1 overflow-hidden">
       {/* Header */}
-      <div className="px-5 pt-12 pb-5 shrink-0" style={{ background: calSt.bg || '#EFF0EB', transition: 'background 0.4s' }}>
+      <div className="px-5 pt-12 pb-5 shrink-0" style={{ background: '#EFF0EB' }}>
         <div className="flex justify-between items-start mb-4">
           <div>
             <p className="text-sm font-normal mb-0.5" style={{ color: '#8A9688' }}>{greeting()}</p>
@@ -151,10 +162,16 @@ export default function Home({ onNavigate }) {
             </h1>
           </div>
           <div className="flex items-center gap-2">
+            {logStreak >= 1 && (
+              <span className="rounded-pill px-2.5 py-1 text-xs font-medium"
+                style={{ background: '#E2EAE0', color: '#3D5240' }}>
+                🍽️ {logStreak}d
+              </span>
+            )}
             {streak >= 1 && (
               <span className="rounded-pill px-2.5 py-1 text-xs font-medium"
                 style={{ background: '#E2EAE0', color: '#3D5240' }}>
-                🔥 {streak}d streak
+                🔥 {streak}d
               </span>
             )}
             <div className="w-9 h-9 rounded-full flex items-center justify-center"
@@ -165,27 +182,20 @@ export default function Home({ onNavigate }) {
             </div>
           </div>
         </div>
-        {/* Calorie bar — color shifts with status */}
+        {/* Calorie bar — zone label is primary, number is secondary */}
         <div>
-          <div className="flex justify-between items-baseline mb-1.5">
-            <span className="text-xs font-medium" style={{ color: '#8A9688' }}>Calories today</span>
-            <span className="text-xs font-semibold" style={{ color: calSt.color }}>
-              {todayKcal} <span style={{ color: '#8A9688', fontWeight: 400 }}>/ {goals.cal_goal} kcal</span>
-            </span>
+          <div className="flex justify-between items-center mb-1.5">
+            <span className="text-sm font-semibold" style={{ color: zone.color }}>{zone.label}</span>
+            <span className="text-xs" style={{ color: '#8A9688' }}>{todayKcal} / {goals.cal_goal} kcal</span>
           </div>
           <div className="h-2 rounded-full overflow-hidden" style={{ background: '#E4E7DF' }}>
             <div className="h-full rounded-full progress-bar-fill transition-all"
-              style={{ width: `${calPct}%`, background: calSt.color }} />
+              style={{ width: `${calPct}%`, background: zone.bar }} />
           </div>
-          {calSt.status === 'over' && (
-            <p className="text-xs mt-1 font-medium" style={{ color: '#DC2626' }}>
-              {todayKcal - goals.cal_goal} kcal over goal
-            </p>
-          )}
         </div>
       </div>
 
-      {/* Alert chips */}
+      {/* Gentle nudge chips */}
       {homeAlerts.length > 0 && (
         <div className="flex gap-2 px-4 py-2 overflow-x-auto scrollable bg-white border-b border-stone-100">
           {homeAlerts.map(a => (
